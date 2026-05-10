@@ -26,7 +26,8 @@
     .logo-svg { width: 44px; height: 44px; }
     .brand h1 { font-family: 'Space Grotesk', monospace; font-size: 1.7rem; font-weight: 600; background: linear-gradient(135deg, #e0f2fe, #a5f3c3); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .brand p { font-size: 0.8rem; color: #8aaac8; margin-top: 4px; }
-    .header-actions { display: flex; gap: 12px; align-items: center; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; min-width: 0; }
+    .header-actions button { min-width: 120px; flex: 1 1 auto; }
     .live-badge { display: flex; align-items: center; gap: 8px; background: rgba(0, 229, 160, 0.1); backdrop-filter: blur(4px); border: 1px solid rgba(0, 229, 160, 0.3); border-radius: 40px; padding: 6px 16px; font-size: 0.75rem; font-weight: 500; color: #00e5a0; }
     .dot-pulse { width: 8px; height: 8px; background: #00e5a0; border-radius: 50%; box-shadow: 0 0 6px #00e5a0; animation: pulse 1.2s infinite; }
     @keyframes pulse { 0% { opacity: 0.4; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }
@@ -65,7 +66,40 @@
     .new-row td { animation: newRowFlash 2s ease-out; }
     .footer { display: flex; justify-content: space-between; font-size: 0.7rem; color: #5f7f9e; margin-top: 20px; }
     .notif-banner { display: none; background: rgba(0, 229, 160, 0.12); border: 1px solid rgba(0, 229, 160, 0.3); border-radius: 60px; padding: 8px 20px; margin-top: 16px; align-items: center; gap: 12px; font-size: 0.8rem; backdrop-filter: blur(4px); }
-    @media (max-width: 720px) { .container { padding: 16px; } .stat-number { font-size: 1.6rem; } th, td { padding: 12px 12px; } }
+    .tx-cards { display: grid; gap: 16px; padding: 12px 0; }
+    .tx-card { background: rgba(8, 16, 24, 0.88); border: 1px solid rgba(42, 58, 85, 0.8); border-radius: 24px; padding: 18px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+    .tx-card.high-volume { border-color: rgba(0, 229, 160, 0.6); }
+    .tx-card-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tx-card-row:last-child { margin-bottom: 0; }
+    .tx-card-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #7c9bc0; margin-bottom: 4px; }
+    .tx-card-value { font-size: 0.95rem; color: #eef5ff; word-break: break-word; }
+    .tx-card-link { color: #7bc5ff; font-size: 0.88rem; word-break: break-word; }
+    .tx-card .amount { font-size: 1.05rem; font-weight: 700; }
+    .tx-card .status-ok { padding: 4px 10px; }
+    @media (max-width: 1024px) {
+      .header-actions { justify-content: center; }
+      .header-actions button { flex: 1 1 180px; }
+    }
+    @media (max-width: 900px) {
+      .header-actions button { flex: 1 1 45%; }
+    }
+    @media (max-width: 720px) {
+      .container { padding: 16px; }
+      .header { gap: 16px; }
+      .header-actions { flex-direction: column; align-items: stretch; width: 100%; }
+      .header-actions button { width: 100%; justify-content: center; }
+      .proxy-row { flex-direction: column; align-items: stretch; }
+      .proxy-row input { width: 100%; min-width: 0; }
+      .config-card, .table-panel { padding: 18px 16px 20px; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .stat-card { width: 100%; }
+      .stat-number { font-size: 1.6rem; }
+      .panel-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .tx-badge { margin-left: 0; }
+      .table-wrapper { overflow-x: hidden; }
+      table { width: 100%; }
+      th, td { padding: 12px 10px; font-size: 0.82rem; }
+    }
   </style>
 </head>
 <body>
@@ -162,6 +196,7 @@
   function nm(n) { return typeof n === 'number' ? n.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'; }
   function setLoading(msg) { document.getElementById('txBody').innerHTML = `<div style="text-align:center; padding:48px;">⏳ ${msg}</div>`; }
   function setEmpty(msg) { document.getElementById('txBody').innerHTML = `<div style="text-align:center; padding:48px;">🔍 ${msg}</div>`; ['sTx','sTot','sWal','sLat'].forEach(id=>document.getElementById(id).textContent='—'); document.getElementById('txBadge').textContent='0 txs'; }
+  function isMobileView() { return window.matchMedia('(max-width: 760px)').matches || window.innerWidth < 760 || document.documentElement.clientWidth < 760; }
 
   // Regular alert (short chime)
   function playAlert() {
@@ -204,11 +239,33 @@
     } catch(e) { console.log('audio error', e); }
   }
 
+  async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      await navigator.serviceWorker.register('/sw.js');
+      console.log('Service worker registered');
+    } catch (err) {
+      console.log('Service worker registration failed:', err);
+    }
+  }
+
+  async function showBrowserNotification(title, options) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, options);
+    } catch (err) {
+      console.log('Notification failed:', err);
+    }
+  }
+
   let seenSigs = new Set();
   let firstLoad = true;
   let audioContext = null;
   let notifyNormal = false;
   let notifyHigh = false;
+  let currentTxs = [];
 
   function initAudioContext() {
     if (audioContext) return;
@@ -262,13 +319,13 @@
           const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
           if (isHigh && notifyHigh) {
             playHighVolumeAlert();
-            new Notification('🔴 HIGH VOLUME ONyc MOVEMENT 🔴', {
+            showBrowserNotification('🔴 HIGH VOLUME ONyc MOVEMENT 🔴', {
               body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — ⚠️ LARGE TRANSACTION!`,
               icon: 'https://www.onre.finance/favicon.ico'
             });
           } else if (!isHigh && notifyNormal) {
             playAlert();
-            new Notification('🔔 ONyc movement detected', {
+            showBrowserNotification('🔔 ONyc movement detected', {
               body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — click to inspect`,
               icon: 'https://www.onre.finance/favicon.ico'
             });
@@ -277,6 +334,7 @@
       }
       firstLoad = false;
       seenSigs = new Set(results.map(r=>r.sig));
+      currentTxs = results;
       renderTable(results);
       document.getElementById('lastUpdate').innerText = 'Updated: ' + new Date().toLocaleTimeString();
     } catch(e) {
@@ -304,6 +362,35 @@
     }
     if (!txs.length) { setEmpty('No ONyc movements in last 50 tx.'); return; }
 
+    const mobile = isMobileView();
+    if (mobile) {
+      const cards = txs.map(tx => {
+        const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
+        return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
+          <div class="tx-card-row"><div>
+            <div class="tx-card-label">Signature</div>
+            <a class="tx-card-link" href="https://solscan.io/tx/${tx.sig}" target="_blank">${sh(tx.sig)}</a>
+          </div><div><span class="status-ok">✓ OK</span></div></div>
+          <div class="tx-card-row"><div>
+            <div class="tx-card-label">Amount</div>
+            <div class="tx-card-value amount">${nm(tx.amount)} ONyc</div>
+          </div><div>
+            <div class="tx-card-label">Age</div>
+            <div class="tx-card-value">${ta(tx.ts)}</div>
+          </div></div>
+          <div class="tx-card-row"><div>
+            <div class="tx-card-label">Wallet</div>
+            <div class="tx-card-value wallet-addr" title="${tx.from}">${sh(tx.from)}</div>
+          </div><div>
+            <div class="tx-card-label">When</div>
+            <div class="tx-card-value">${fd(tx.ts)}</div>
+          </div></div>
+        </div>`;
+      }).join('');
+      document.getElementById('txBody').innerHTML = `<div class="tx-cards">${cards}</div>`;
+      return;
+    }
+
     const rows = txs.map(tx => {
       const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
@@ -326,7 +413,7 @@
     `;
   }
 
-  function requestNotificationPermission() {
+  async function requestNotificationPermission() {
     if (!('Notification' in window)) {
       alert('Notifications not supported in this browser');
       return;
@@ -341,6 +428,7 @@
       alert('Notifications are blocked. To enable:\n\n1. Click the 🔒 lock icon in the address bar\n2. Find "Notifications" and change it to "Allow"\n3. Refresh the page');
       return;
     }
+    await registerServiceWorker();
     Notification.requestPermission().then(p => {
       console.log('Permission result:', p);
       if (p === 'granted') {
@@ -419,7 +507,8 @@
   }
 
   setInterval(() => { if (getProxy()) fetchAll(); }, 30000);
-  window.addEventListener('load', () => { if (getProxy()) fetchAll(); updateNotifUI(); });
+  window.addEventListener('resize', () => { if (currentTxs.length) renderTable(currentTxs); });
+  window.addEventListener('load', async () => { await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>
 <style>
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }

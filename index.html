@@ -328,16 +328,42 @@
   }
 
   function toggleNotif() {
-    if (!('Notification' in window)) { alert('Notifications not supported'); return; }
+    if (!('Notification' in window)) { 
+      alert('Notifications not supported in this browser'); 
+      console.log('Notification API not available');
+      return; 
+    }
+    console.log('Current permission:', Notification.permission);
+    
     if (Notification.permission === 'granted') {
       notifOn = !notifOn;
       initAudioContext();
       resumeAudioContext();
       updateNotifUI();
       if (notifOn) playAlert();
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(p => { if (p === 'granted') { initAudioContext(); notifOn = true; updateNotifUI(); playAlert(); } });
-    } else { alert('Notifications blocked. Unblock in browser settings (🔒 icon).'); }
+      console.log('Notifications toggled. notifOn =', notifOn);
+    } else if (Notification.permission === 'denied') {
+      alert('Notifications are blocked. To enable:\n\n1. Click the 🔒 lock icon in the address bar\n2. Find "Notifications" and change it to "Allow"\n3. Then try the Bell button again');
+      console.log('Notifications permanently denied. User must unblock in browser settings.');
+    } else {
+      console.log('Requesting notification permission...');
+      Notification.requestPermission().then(p => { 
+        console.log('Permission result:', p);
+        if (p === 'granted') { 
+          initAudioContext(); 
+          notifOn = true; 
+          updateNotifUI(); 
+          playAlert(); 
+          console.log('Permission granted, notifications enabled');
+        } else if (p === 'denied') {
+          console.log('Permission denied by user');
+          alert('Notifications blocked. Check your browser settings.');
+        }
+      }).catch(e => {
+        console.error('Permission request error:', e);
+        alert('Error requesting notification permission: ' + e.message);
+      });
+    }
   }
   function updateNotifUI() {
     const btn = document.getElementById('notifyBtn');

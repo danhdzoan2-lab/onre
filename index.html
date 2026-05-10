@@ -84,7 +84,9 @@
     </div>
     <div class="header-actions">
       <div class="live-badge"><span class="dot-pulse"></span> LIVE</div>
-      <button id="notifyBtn" onclick="toggleNotif()">🔔 Enable Bell</button>
+      <button id="notifyBtn" onclick="requestNotificationPermission()">🔔 Enable Notifications</button>
+      <button id="normalNotifBtn" onclick="toggleNormalNotif()">🔔 Normal OFF</button>
+      <button id="highNotifBtn" onclick="toggleHighNotif()">🚨 High Volume OFF</button>
       <button id="rfBtn" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
     </div>
   </div>
@@ -203,9 +205,10 @@
   }
 
   let seenSigs = new Set();
-  let notifOn = false;
   let firstLoad = true;
   let audioContext = null;
+  let notifyNormal = false;
+  let notifyHigh = false;
 
   function initAudioContext() {
     if (audioContext) return;
@@ -253,26 +256,22 @@
         results.push({ sig: top[i], ts: tx.blockTime, from, amount, isNew: !seenSigs.has(top[i]) });
       }
 
-      if (!firstLoad && notifOn) {
+      if (!firstLoad && Notification.permission === 'granted') {
         const newOnes = results.filter(r=>r.isNew);
         for (const tx of newOnes) {
           const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
-          if (isHigh) {
+          if (isHigh && notifyHigh) {
             playHighVolumeAlert();
-            if (Notification.permission === 'granted') {
-              new Notification('🔴 HIGH VOLUME ONyc MOVEMENT 🔴', {
-                body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — ⚠️ LARGE TRANSACTION!`,
-                icon: 'https://www.onre.finance/favicon.ico'
-              });
-            }
-          } else {
+            new Notification('🔴 HIGH VOLUME ONyc MOVEMENT 🔴', {
+              body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — ⚠️ LARGE TRANSACTION!`,
+              icon: 'https://www.onre.finance/favicon.ico'
+            });
+          } else if (!isHigh && notifyNormal) {
             playAlert();
-            if (Notification.permission === 'granted') {
-              new Notification('🔔 ONyc movement detected', {
-                body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — click to inspect`,
-                icon: 'https://www.onre.finance/favicon.ico'
-              });
-            }
+            new Notification('🔔 ONyc movement detected', {
+              body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — click to inspect`,
+              icon: 'https://www.onre.finance/favicon.ico'
+            });
           }
         }
       }
@@ -327,64 +326,100 @@
     `;
   }
 
-  function toggleNotif() {
-    if (!('Notification' in window)) { 
-      alert('Notifications not supported in this browser'); 
-      console.log('Notification API not available');
-      return; 
+  function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      alert('Notifications not supported in this browser');
+      return;
     }
     console.log('Current permission:', Notification.permission);
-    
     if (Notification.permission === 'granted') {
-      notifOn = !notifOn;
       initAudioContext();
-      resumeAudioContext();
       updateNotifUI();
-      if (notifOn) playAlert();
-      console.log('Notifications toggled. notifOn =', notifOn);
-    } else if (Notification.permission === 'denied') {
-      alert('Notifications are blocked. To enable:\n\n1. Click the 🔒 lock icon in the address bar\n2. Find "Notifications" and change it to "Allow"\n3. Then try the Bell button again');
-      console.log('Notifications permanently denied. User must unblock in browser settings.');
-    } else {
-      console.log('Requesting notification permission...');
-      Notification.requestPermission().then(p => { 
-        console.log('Permission result:', p);
-        if (p === 'granted') { 
-          initAudioContext(); 
-          notifOn = true; 
-          updateNotifUI(); 
-          playAlert(); 
-          console.log('Permission granted, notifications enabled');
-        } else if (p === 'denied') {
-          console.log('Permission denied by user');
-          alert('Notifications blocked. Check your browser settings.');
-        }
-      }).catch(e => {
-        console.error('Permission request error:', e);
-        alert('Error requesting notification permission: ' + e.message);
-      });
+      return;
     }
+    if (Notification.permission === 'denied') {
+      alert('Notifications are blocked. To enable:\n\n1. Click the 🔒 lock icon in the address bar\n2. Find "Notifications" and change it to "Allow"\n3. Refresh the page');
+      return;
+    }
+    Notification.requestPermission().then(p => {
+      console.log('Permission result:', p);
+      if (p === 'granted') {
+        initAudioContext();
+        alert('Notifications permission granted. Now toggle Normal or High Volume alerts.');
+      } else {
+        alert('Notifications blocked. Check your browser settings.');
+      }
+      updateNotifUI();
+    }).catch(e => {
+      console.error('Permission request error:', e);
+      alert('Error requesting notification permission: ' + e.message);
+    });
   }
+
+  function toggleNormalNotif() {
+    if (!('Notification' in window)) { alert('Notifications not supported'); return; }
+    if (Notification.permission === 'denied') {
+      alert('Notifications are blocked. Allow them in browser settings first.');
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      requestNotificationPermission();
+      return;
+    }
+    initAudioContext();
+    resumeAudioContext();
+    notifyNormal = !notifyNormal;
+    updateNotifUI();
+  }
+
+  function toggleHighNotif() {
+    if (!('Notification' in window)) { alert('Notifications not supported'); return; }
+    if (Notification.permission === 'denied') {
+      alert('Notifications are blocked. Allow them in browser settings first.');
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      requestNotificationPermission();
+      return;
+    }
+    initAudioContext();
+    resumeAudioContext();
+    notifyHigh = !notifyHigh;
+    updateNotifUI();
+  }
+
   function updateNotifUI() {
-    const btn = document.getElementById('notifyBtn');
+    const notifyBtn = document.getElementById('notifyBtn');
+    const normalBtn = document.getElementById('normalNotifBtn');
+    const highBtn = document.getElementById('highNotifBtn');
     const banner = document.getElementById('notifBanner');
-    if (notifOn) {
-      btn.innerHTML = '🔔 Bell ON';
-      btn.style.background = 'rgba(0,229,160,0.2)';
-      btn.style.borderColor = '#00e5a0';
-      btn.style.color = '#00e5a0';
+
+    if (Notification.permission === 'granted') {
+      notifyBtn.innerHTML = '🔔 Notifications Ready';
+      notifyBtn.style.background = 'rgba(0,229,160,0.15)';
+      notifyBtn.style.borderColor = '#00e5a0';
+      notifyBtn.style.color = '#00e5a0';
+      normalBtn.disabled = false;
+      highBtn.disabled = false;
+      normalBtn.innerHTML = `🔔 Normal ${notifyNormal ? 'ON' : 'OFF'}`;
+      highBtn.innerHTML = `🚨 High Volume ${notifyHigh ? 'ON' : 'OFF'}`;
       banner.style.display = 'flex';
+      banner.innerText = `🔔 Normal: ${notifyNormal ? 'ON' : 'OFF'} · 🚨 High Volume: ${notifyHigh ? 'ON' : 'OFF'}`;
     } else {
-      btn.innerHTML = '🔔 Enable Bell';
-      btn.style.background = '';
-      btn.style.borderColor = '';
-      btn.style.color = '';
+      notifyBtn.innerHTML = '🔔 Enable Notifications';
+      notifyBtn.style.background = '';
+      notifyBtn.style.borderColor = '';
+      notifyBtn.style.color = '';
+      normalBtn.disabled = true;
+      highBtn.disabled = true;
+      normalBtn.innerHTML = '🔔 Normal OFF';
+      highBtn.innerHTML = '🚨 High Volume OFF';
       banner.style.display = 'none';
     }
   }
 
   setInterval(() => { if (getProxy()) fetchAll(); }, 30000);
-  window.addEventListener('load', () => { if (getProxy()) fetchAll(); });
+  window.addEventListener('load', () => { if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>
 <style>
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }

@@ -163,15 +163,16 @@
 
   // Regular alert (short chime)
   function playAlert() {
+    resumeAudioContext();
+    if (!audioContext) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
       [523.25, 659.25, 783.99].forEach((freq,i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain); gain.connect(audioContext.destination);
         osc.frequency.value = freq;
         osc.type = 'sine';
-        const t = ctx.currentTime + i*0.18;
+        const t = audioContext.currentTime + i*0.18;
         gain.gain.setValueAtTime(0, t);
         gain.gain.linearRampToValueAtTime(0.4, t+0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, t+0.35);
@@ -182,16 +183,17 @@
 
   // High‑volume alert (distinct two‑tone, louder)
   function playHighVolumeAlert() {
+    resumeAudioContext();
+    if (!audioContext) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
       // lower bass then rising
       [220, 440, 880].forEach((freq,i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain); gain.connect(audioContext.destination);
         osc.frequency.value = freq;
         osc.type = 'sine';
-        const t = ctx.currentTime + i*0.2;
+        const t = audioContext.currentTime + i*0.2;
         gain.gain.setValueAtTime(0, t);
         gain.gain.linearRampToValueAtTime(0.5, t+0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, t+0.5);
@@ -203,6 +205,22 @@
   let seenSigs = new Set();
   let notifOn = false;
   let firstLoad = true;
+  let audioContext = null;
+
+  function initAudioContext() {
+    if (audioContext) return;
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) {
+      console.log('AudioContext init error:', e);
+    }
+  }
+
+  function resumeAudioContext() {
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume().catch(e => console.log('Resume error:', e));
+    }
+  }
 
   async function fetchAll() {
     const proxy = getProxy();
@@ -313,11 +331,12 @@
     if (!('Notification' in window)) { alert('Notifications not supported'); return; }
     if (Notification.permission === 'granted') {
       notifOn = !notifOn;
-      try { new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+      initAudioContext();
+      resumeAudioContext();
       updateNotifUI();
       if (notifOn) playAlert();
     } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(p => { if (p === 'granted') { notifOn = true; updateNotifUI(); playAlert(); } });
+      Notification.requestPermission().then(p => { if (p === 'granted') { initAudioContext(); notifOn = true; updateNotifUI(); playAlert(); } });
     } else { alert('Notifications blocked. Unblock in browser settings (🔒 icon).'); }
   }
   function updateNotifUI() {

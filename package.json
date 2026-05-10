@@ -1,0 +1,21 @@
+{
+  "name": "onre-movement-tracker",
+  "version": "1.0.0",
+  "description": "Real-time ONyc Movement Tracker - Exponent Core integration with Solana RPC via Cloudflare Workers",
+  "author": "OnRe",
+  "license": "MIT",
+  "keywords": [
+    "solana",
+    "tracker",
+    "onrc",
+    "exponent",
+    "real-time"
+  ],
+  "scripts": {
+    "dev": "npx http-server",
+    "build": "echo 'No build needed for static site'"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -33,6 +33,9 @@
     @keyframes pulse { 0% { opacity: 0.4; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }
     button { font-family: 'Inter', sans-serif; background: rgba(20, 30, 45, 0.8); backdrop-filter: blur(4px); border: 1px solid #2a3a55; padding: 8px 18px; border-radius: 40px; font-size: 0.8rem; font-weight: 500; color: #c0d4f0; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 8px; }
     button:hover { background: rgba(0, 229, 160, 0.15); border-color: #00e5a0; color: #00e5a0; transform: translateY(-1px); }
+    .tab-btn { background: rgba(20, 30, 45, 0.6); border: 1px solid #2a3a55; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+    .tab-btn:hover { background: rgba(0, 229, 160, 0.15); border-color: #00e5a0; color: #00e5a0; }
+    .tab-btn.active { background: rgba(0, 229, 160, 0.2); border-color: #00e5a0; color: #00e5a0; }
     .config-card { background: rgba(12, 20, 30, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(42, 58, 85, 0.5); border-radius: 28px; padding: 20px 28px; margin-bottom: 32px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
     .config-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; color: #7c9bc0; margin-bottom: 12px; }
     .proxy-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
@@ -114,9 +117,13 @@
         <text x="50" y="77" text-anchor="middle" fill="#00e5a0" font-size="16" font-weight="bold" font-family="'Space Grotesk', monospace" letter-spacing="1">OnRe</text>
         <defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00e5a0"/><stop offset="100%" stop-color="#4da6ff"/></linearGradient></defs>
       </svg>
-      <div class="brand"><h1>ONyc Movement Tracker</h1><p>real‑time alerts · Exponent Core · buy the dip on YT</p></div>
+      <div class="brand"><h1 id="trackerTitle">ONyc Movement Tracker</h1><p id="trackerSubtitle">real‑time alerts · Exponent Core · buy the dip on YT</p></div>
     </div>
     <div class="header-actions">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button id="tabOnyc" class="tab-btn active" onclick="switchTracker('onyc')" style="border-color: #00e5a0; color: #00e5a0;">ONyc</button>
+        <button id="tabSolstice" class="tab-btn" onclick="switchTracker('solstice')">Solstice</button>
+      </div>
       <div class="live-badge"><span class="dot-pulse"></span> LIVE</div>
       <button id="notifyBtn" onclick="requestNotificationPermission()">🔔 Enable Notifications</button>
       <button id="normalNotifBtn" onclick="toggleNormalNotif()">🔔 Normal OFF</button>
@@ -131,19 +138,19 @@
       <input type="text" id="proxyUrl" value="https://wild-night-f072.amazygo1.workers.dev" />
       <button onclick="fetchAll()">▶ Load Data</button>
     </div>
-    <div class="warn-note">⚠ Open in a real browser tab — not inside AI viewer. Auto‑refresh 30s. <span style="color:#00e5a0;">🔔 High volume (>5,000 ONyc) gets special alert, alarm sound, and highlight.</span></div>
+    <div class="warn-note">⚠ Open in a real browser tab — not inside AI viewer. Auto‑refresh 30s. <span style="color:#00e5a0;" id="volumeNote">🔔 High volume (>5,000 ONyc) gets special alert, alarm sound, and highlight.</span></div>
     <div id="notifBanner" class="notif-banner">🔔 Notifications + Sound ON — you'll be alerted for every new ONyc movement</div>
   </div>
 
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-label">Total Transactions</div><div class="stat-number" id="sTx">—</div><div class="stat-sub">last 50 signatures</div></div>
-    <div class="stat-card"><div class="stat-label">ONyc Volume</div><div class="stat-number" id="sTot">—</div><div class="stat-sub">total moved</div></div>
+    <div class="stat-card"><div class="stat-label"><span id="volumeLabel">ONyc</span> Volume</div><div class="stat-number" id="sTot">—</div><div class="stat-sub">total moved</div></div>
     <div class="stat-card"><div class="stat-label">Active Wallets</div><div class="stat-number" id="sWal">—</div><div class="stat-sub">unique signers</div></div>
     <div class="stat-card"><div class="stat-label">Latest Activity</div><div class="stat-number" id="sLat">—</div><div class="stat-sub" id="sLatH"></div></div>
   </div>
 
   <div class="table-panel">
-    <div class="panel-header"><div class="panel-title">📡 ONyc Transactions (Exponent)</div><div class="tx-badge" id="txBadge">0 txs</div></div>
+    <div class="panel-header"><div class="panel-title" id="panelTitle">📡 ONyc Transactions (Exponent)</div><div class="tx-badge" id="txBadge">0 txs</div></div>
     <div class="table-wrapper" id="txBody"><div style="text-align:center; padding:48px;">⚙️ Click Load Data to start tracking</div></div>
   </div>
   <div class="footer"><span id="lastUpdate">Not yet fetched</span><span>🔗 free Solana RPC via Cloudflare Worker · alerts on every new movement</span></div>
@@ -151,10 +158,48 @@
 
 <script>
   const PROGRAM = 'ExponentnaRg3CQbW6dqQNZKXp7gtZ9DGMp1cwC4HAS7';
-  const TOKEN   = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
-  const HIGH_VOLUME_THRESHOLD = 5000;
+  
+  const trackers = {
+    onyc: {
+      name: 'ONyc',
+      title: 'ONyc Movement Tracker',
+      subtitle: 'real‑time alerts · Exponent Core · buy the dip on YT',
+      tokens: ['5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5'],
+      highVolumeThreshold: 5000,
+      panelTitle: '📡 ONyc Transactions (Exponent)',
+      volumeNote: '🔔 High volume (>5,000 ONyc) gets special alert, alarm sound, and highlight.'
+    },
+    solstice: {
+      name: 'Solstice',
+      title: 'Solstice Protocol Tracker',
+      subtitle: 'USX + eUSX real‑time alerts · Exponent Core',
+      tokens: ['6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG', '3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC'],
+      highVolumeThreshold: 1000,
+      panelTitle: '📡 Solstice Transactions (USX + eUSX)',
+      volumeNote: '🔔 High volume (>1,000) gets special alert, alarm sound, and highlight.'
+    }
+  };
 
-  function getOnycAmount(tx) {
+  let currentTracker = 'onyc';
+
+  function switchTracker(tracker) {
+    if (currentTracker === tracker) return;
+    currentTracker = tracker;
+    const cfg = trackers[tracker];
+    document.getElementById('trackerTitle').textContent = cfg.title;
+    document.getElementById('trackerSubtitle').textContent = cfg.subtitle;
+    document.getElementById('panelTitle').textContent = cfg.panelTitle;
+    document.getElementById('volumeNote').textContent = cfg.volumeNote;
+    document.getElementById('volumeLabel').textContent = cfg.name;
+    document.getElementById('tabOnyc').classList.toggle('active');
+    document.getElementById('tabSolstice').classList.toggle('active');
+    seenSigs = new Set();
+    firstLoad = true;
+    currentTxs = [];
+    fetchAll();
+  }
+
+  function getTokenAmount(tx, tokenList) {
     const meta = tx.meta;
     const keys = tx.transaction?.message?.accountKeys || [];
     const signerIdx = keys.findIndex(k => k?.signer === true);
@@ -163,7 +208,7 @@
     const post = meta?.postTokenBalances || [];
     let signerOut = 0;
     for (const preBal of pre) {
-      if (preBal.mint !== TOKEN) continue;
+      if (!tokenList.includes(preBal.mint)) continue;
       if (preBal.owner !== keys[signerIdx]?.pubkey) continue;
       const postBal = post.find(p => p.accountIndex === preBal.accountIndex);
       const preAmt = preBal.uiTokenAmount?.uiAmount || 0;
@@ -174,7 +219,7 @@
     if (signerOut > 0) return signerOut;
     let maxIn = 0;
     for (const postBal of post) {
-      if (postBal.mint !== TOKEN) continue;
+      if (!tokenList.includes(postBal.mint)) continue;
       const preBal = pre.find(p => p.accountIndex === postBal.accountIndex);
       const delta = (postBal.uiTokenAmount?.uiAmount||0) - (preBal?.uiTokenAmount?.uiAmount||0);
       if (delta > maxIn) maxIn = delta;
@@ -306,9 +351,10 @@
         if (!tx) continue;
         const meta = tx.meta, msg = tx.transaction?.message;
         if (!msg) continue;
+        const cfg = trackers[currentTracker];
         const allBals = [...(meta?.preTokenBalances||[]), ...(meta?.postTokenBalances||[])];
-        if (!allBals.some(b => b.mint === TOKEN)) continue;
-        const amount = getOnycAmount(tx);
+        if (!allBals.some(b => cfg.tokens.includes(b.mint))) continue;
+        const amount = getTokenAmount(tx, cfg.tokens);
         if (amount <= 0) continue;
         const keys = msg.accountKeys || [];
         const from = (keys.find(k=>k?.signer===true)?.pubkey) || keys[0]?.pubkey || '';
@@ -317,18 +363,19 @@
 
       if (!firstLoad && Notification.permission === 'granted') {
         const newOnes = results.filter(r=>r.isNew);
+        const cfg = trackers[currentTracker];
         for (const tx of newOnes) {
-          const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
+          const isHigh = tx.amount > cfg.highVolumeThreshold;
           if (isHigh && notifyHigh) {
             playHighVolumeAlert();
-            showBrowserNotification('🔴 HIGH VOLUME ONyc MOVEMENT 🔴', {
-              body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — ⚠️ LARGE TRANSACTION!`,
+            showBrowserNotification(`🔴 HIGH VOLUME ${cfg.name} MOVEMENT 🔴`, {
+              body: `${nm(tx.amount)} from ${sh(tx.from)} — ⚠️ LARGE TRANSACTION!`,
               icon: 'https://www.onre.finance/favicon.ico'
             });
           } else if (!isHigh && notifyNormal) {
             playAlert();
-            showBrowserNotification('🔔 ONyc movement detected', {
-              body: `${nm(tx.amount)} ONyc from ${sh(tx.from)} — click to inspect`,
+            showBrowserNotification(`🔔 ${cfg.name} movement detected`, {
+              body: `${nm(tx.amount)} from ${sh(tx.from)} — click to inspect`,
               icon: 'https://www.onre.finance/favicon.ico'
             });
           }
@@ -350,11 +397,12 @@
   }
 
   function renderTable(txs) {
+    const cfg = trackers[currentTracker];
     document.getElementById('sTx').innerText = txs.length;
     document.getElementById('txBadge').innerText = txs.length + ' txs';
     document.getElementById('sWal').innerText = new Set(txs.map(t=>t.from)).size;
     const total = txs.reduce((a,t)=>a+t.amount,0);
-    document.getElementById('sTot').innerHTML = total ? nm(total) + ' ONyc' : '—';
+    document.getElementById('sTot').innerHTML = total ? nm(total) + ' ' + cfg.name : '—';
     if (txs[0]) {
       document.getElementById('sLat').innerText = ta(txs[0].ts);
       document.getElementById('sLatH').innerText = fd(txs[0].ts);
@@ -362,12 +410,12 @@
       document.getElementById('sLat').innerText = '—';
       document.getElementById('sLatH').innerText = '';
     }
-    if (!txs.length) { setEmpty('No ONyc movements in last 50 tx.'); return; }
+    if (!txs.length) { setEmpty(`No ${cfg.name} movements in last 50 tx.`); return; }
 
     const mobile = isMobileView();
     if (mobile) {
       const cards = txs.map(tx => {
-        const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
+        const isHigh = tx.amount > cfg.highVolumeThreshold;
         return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Signature</div>
@@ -375,7 +423,7 @@
           </div><div><span class="status-ok">✓ OK</span></div></div>
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Amount</div>
-            <div class="tx-card-value amount">${nm(tx.amount)} ONyc</div>
+            <div class="tx-card-value amount">${nm(tx.amount)} ${cfg.name}</div>
           </div><div>
             <div class="tx-card-label">Age</div>
             <div class="tx-card-value">${ta(tx.ts)}</div>
@@ -394,13 +442,13 @@
     }
 
     const rows = txs.map(tx => {
-      const isHigh = tx.amount > HIGH_VOLUME_THRESHOLD;
+      const isHigh = tx.amount > cfg.highVolumeThreshold;
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank">${sh(tx.sig)}</a></td>
         <td><span class="status-ok">✓ OK</span></td>
         <td class="wallet-addr" title="${tx.from}">${sh(tx.from)}</td>
-        <td class="amount">${nm(tx.amount)} ONyc</td>
+        <td class="amount">${nm(tx.amount)} ${cfg.name}</td>
         <td>${ta(tx.ts)}</td>
         <td>${fd(tx.ts)}</td>
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank">↗</a></td>
@@ -409,7 +457,7 @@
 
     document.getElementById('txBody').innerHTML = `
       <table>
-        <thead><tr><th>Signature</th><th>Status</th><th>Wallet</th><th>ONyc Amount</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
+        <thead><tr><th>Signature</th><th>Status</th><th>Wallet</th><th>${cfg.name} Amount</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;

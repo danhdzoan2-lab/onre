@@ -211,6 +211,7 @@
     { label: 'YT-ONyc', mint: TOKEN_MINTS.ytOnyc },
     { label: 'LP-ONyc', mint: TOKEN_MINTS.lpOnyc }
   ];
+  const PT_ONYC_ONYC_POOL_WALLET = 'BmLiVHRb9ppTrEA5jhTgNJ2WFtjUZEkfzJZGswEidxzu';
   
   const trackers = {
     onyc: {
@@ -292,10 +293,67 @@
     return amounts;
   }
 
-  function formatTrackedAmounts(amounts) {
-    const entries = ONYC_TRACKED_TOKENS
-      .filter(token => (amounts[token.label] || 0) > 0)
-      .map(token => `${escapeHtml(token.label)}: ${escapeHtml(nm(amounts[token.label]))}`);
+  function getTrackedTokenOrder(tx, amounts, interaction = '') {
+    const labelsWithAmounts = ONYC_TRACKED_TOKENS.filter(token => (amounts[token.label] || 0) > 0).map(token => token.label);
+    if (!labelsWithAmounts.length) return [];
+
+    const ordered = [];
+    const seen = new Set();
+    const accountKeys = (tx.transaction?.message?.accountKeys || []).map(k => k?.pubkey || '');
+
+    const appendFromInner = innerIxList => {
+      for (const entry of (innerIxList || [])) {
+        for (const ix of (entry.instructions || [])) {
+          if (ix.program !== 'spl-token') continue;
+          const parsed = ix.parsed || {};
+          const info = parsed.info || {};
+          const tokenAmount = Number(info.tokenAmount?.uiAmount || info.amount || 0);
+          if (!(tokenAmount > 0)) continue;
+
+          const source = info.source || '';
+          const destination = info.destination || '';
+          const accounts = (ix.accounts || []).map(idx => accountKeys[idx]).filter(Boolean);
+
+          for (const token of ONYC_TRACKED_TOKENS) {
+            if (!labelsWithAmounts.includes(token.label) || seen.has(token.label)) continue;
+            if (source.includes(token.mint) || destination.includes(token.mint) || accounts.includes(token.mint)) {
+              ordered.push(token.label);
+              seen.add(token.label);
+            }
+          }
+        }
+      }
+    };
+
+    appendFromInner(tx.meta?.innerInstructions);
+
+    if (ordered.length < labelsWithAmounts.length) {
+      for (const token of ONYC_TRACKED_TOKENS) {
+        if (labelsWithAmounts.includes(token.label) && !seen.has(token.label)) {
+          ordered.push(token.label);
+          seen.add(token.label);
+        }
+      }
+    }
+
+    if (ordered.includes('ONyc') && ordered.includes('PT-ONyc')) {
+      if (interaction === 'Buy PT-ONyc') {
+        return ['ONyc', 'PT-ONyc', ...ordered.filter(label => label !== 'ONyc' && label !== 'PT-ONyc')];
+      }
+      if (interaction === 'Sell PT-ONyc') {
+        return ['PT-ONyc', 'ONyc', ...ordered.filter(label => label !== 'ONyc' && label !== 'PT-ONyc')];
+      }
+    }
+    return ordered;
+  }
+
+  function formatTrackedAmounts(amounts, order = []) {
+    const labels = order.length
+      ? order
+      : ONYC_TRACKED_TOKENS.map(token => token.label);
+    const entries = labels
+      .filter(label => (amounts[label] || 0) > 0)
+      .map(label => `${escapeHtml(label)}: ${escapeHtml(nm(amounts[label]))}`);
     return entries.length ? entries.join('<br>') : '-';
   }
 
@@ -313,6 +371,15 @@
     return postSum - preSum;
   }
 
+  function getOwnerMintDelta(tx, owner, mint) {
+    if (!owner || !mint) return 0;
+    const pre = tx.meta?.preTokenBalances || [];
+    const post = tx.meta?.postTokenBalances || [];
+    const preSum = pre.filter(b => b.owner === owner && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
+    const postSum = post.filter(b => b.owner === owner && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
+    return postSum - preSum;
+  }
+
   function classifyInteraction(tx, signer) {
     const EPS = 1e-9;
     const isPos = value => value > EPS;
@@ -321,6 +388,8 @@
     const lp = getSignerMintDelta(tx, signer, TOKEN_MINTS.lpOnyc);
     const pt = getSignerMintDelta(tx, signer, TOKEN_MINTS.ptOnyc);
     const yt = getSignerMintDelta(tx, signer, TOKEN_MINTS.ytOnyc);
+    const signerOnyc = getSignerMintDelta(tx, signer, TOKEN_MINTS.onyc);
+    const poolOnyc = getOwnerMintDelta(tx, PT_ONYC_ONYC_POOL_WALLET, TOKEN_MINTS.onyc);
 
     const mintWrapped = isPos(wrapped);
     const burnWrapped = isNeg(wrapped);
@@ -329,9 +398,13 @@
     const burnPt = isNeg(pt);
     const mintYt = isPos(yt);
     const burnYt = isNeg(yt);
+    const signerOnycOutToPool = isNeg(signerOnyc) && isPos(poolOnyc);
+    const signerOnycInFromPool = isPos(signerOnyc) && isNeg(poolOnyc);
 
     if (mintWrapped && mintLp && !mintYt) return 'Add LP-ONyc (swap + supply)';
     if (mintWrapped && mintLp && mintYt) return 'Add LP-ONyc (mint + supply)';
+    if (mintWrapped && mintPt && !mintLp && !mintYt && signerOnycOutToPool) return 'Buy PT-ONyc';
+    if (burnWrapped && burnPt && !mintLp && !mintYt && !burnYt && signerOnycInFromPool) return 'Sell PT-ONyc';
     if (mintWrapped && mintPt && !mintLp && !mintYt) return 'Buy PT-ONyc';
     if (burnWrapped && burnPt && !mintLp && !mintYt && !burnYt) return 'Sell PT-ONyc';
     if (mintWrapped && mintPt && mintYt && !mintLp) return 'Buy YT-ONyc';
@@ -490,10 +563,11 @@
           ? Object.values(amounts).reduce((sum, value) => sum + value, 0)
           : getTokenAmount(tx, cfg.tokens);
         if (totalTracked <= 0) continue;
-        const amount = currentTracker === 'onyc' ? (amounts['ONyc'] || 0) : totalTracked;
         const from = getSignerAddress(tx);
         const interaction = classifyInteraction(tx, from);
-        results.push({ sig: top[i], ts: tx.blockTime, from, amount, amounts, interaction, isNew: !seenSigs.has(top[i]) });
+        const amount = currentTracker === 'onyc' ? (amounts['ONyc'] || 0) : totalTracked;
+        const amountOrder = currentTracker === 'onyc' ? getTrackedTokenOrder(tx, amounts, interaction) : [];
+        results.push({ sig: top[i], ts: tx.blockTime, from, amount, amounts, amountOrder, interaction, isNew: !seenSigs.has(top[i]) });
       }
 
       if (!firstLoad && 'Notification' in window && Notification.permission === 'granted') {
@@ -552,7 +626,7 @@
       const cards = txs.map(tx => {
         const isHigh = tx.amount > cfg.highVolumeThreshold;
         const amountDisplay = currentTracker === 'onyc'
-          ? formatTrackedAmounts(tx.amounts || {})
+          ? formatTrackedAmounts(tx.amounts || {}, tx.amountOrder || [])
           : `${escapeHtml(nm(tx.amount))} ${escapeHtml(cfg.name)}`;
         return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
           <div class="tx-card-row"><div>
@@ -587,7 +661,7 @@
       const isHigh = tx.amount > cfg.highVolumeThreshold;
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
       const amountDisplay = currentTracker === 'onyc'
-        ? formatTrackedAmounts(tx.amounts || {})
+        ? formatTrackedAmounts(tx.amounts || {}, tx.amountOrder || [])
         : `${escapeHtml(nm(tx.amount))} ${escapeHtml(cfg.name)}`;
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a></td>

@@ -1,0 +1,4 @@
+# Vercel ignore rules
+node_modules
+.git
+.gitignore

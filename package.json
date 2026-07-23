@@ -1,13 +1,14 @@
 {
-  "name": "onre-movement-tracker",
+  "name": "pt-bulksol-buy-tracker",
   "version": "1.0.0",
-  "description": "Real-time ONyc Movement Tracker - Exponent Core integration with Solana RPC via Cloudflare Workers",
+  "description": "Real-time PT-bulkSOL buy tracker for the Exponent XPC contract via Solana RPC",
   "author": "OnRe",
   "license": "MIT",
   "keywords": [
     "solana",
     "tracker",
-    "onrc",
+    "bulksol",
+    "pt-bulksol",
     "exponent",
     "real-time"
   ],

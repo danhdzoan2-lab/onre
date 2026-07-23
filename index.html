@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>OnRe × ONyc | Real‑time Movement Tracker</title>
+  <title>Exponent | PT-bulkSOL Buy Tracker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -28,11 +28,10 @@
     .container { max-width: 1360px; margin: 0 auto; padding: 24px 28px 28px; }
     .app-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 18px; }
     .logo-area { display: flex; align-items: center; gap: 14px; min-width: 260px; }
-    .brand-logo { width: 42px; height: 42px; flex: 0 0 42px; object-fit: contain; display: block; }
+    .brand-mark { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border: 1px solid rgba(0, 214, 143, 0.48); border-radius: var(--radius); background: var(--accent-soft); color: var(--accent); font-family: 'Space Grotesk', monospace; font-size: 0.84rem; font-weight: 700; letter-spacing: -0.02em; }
     .brand h1 { font-family: 'Space Grotesk', monospace; font-size: 1.55rem; font-weight: 600; letter-spacing: 0; color: var(--text); }
     .brand p { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
     .header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
-    .tracker-tabs { display: grid; grid-template-columns: repeat(2, minmax(96px, 1fr)); gap: 4px; padding: 4px; background: #0c0f0b; border: 1px solid var(--line); border-radius: var(--radius); }
     .live-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(0, 214, 143, 0.35); border-radius: var(--radius); padding: 8px 12px; font-size: 0.74rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
     .dot-pulse { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px rgba(0, 214, 143, 0.8); animation: pulse 1.2s infinite alternate; }
     @keyframes pulse { from { opacity: 0.45; transform: scale(0.85); } to { opacity: 1; transform: scale(1.15); } }
@@ -42,9 +41,6 @@
     button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
     .primary-action { background: var(--accent); color: #03100b; border-color: var(--accent); }
     .primary-action:hover { background: #32e2aa; color: #03100b; }
-    .tab-btn { min-height: 32px; padding: 6px 12px; background: transparent; border: 0; color: var(--muted); }
-    .tab-btn:hover { background: #171b15; color: var(--text); transform: none; }
-    .tab-btn.active { background: var(--accent); color: #03100b; }
     .config-card { display: grid; grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.4fr); gap: 20px; align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
     .config-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 7px; font-weight: 800; }
     .config-heading { font-family: 'Space Grotesk', monospace; font-size: 1.18rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
@@ -104,6 +100,7 @@
     .sig-link:hover { color: var(--accent); text-decoration: underline; }
     .wallet-addr { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #d2dfc8; }
     .amount { font-weight: 700; color: var(--amber); }
+    .amount-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; font-weight: 500; }
     .status-ok { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.2); border-radius: var(--radius); padding: 3px 8px; font-size: 0.7rem; font-weight: 800; color: var(--accent); display: inline-block; }
     .empty-state { min-height: 240px; display: grid; place-items: center; text-align: center; padding: 44px 20px; color: var(--muted); }
     .empty-state strong { display: block; color: var(--text); font-size: 1rem; margin-bottom: 6px; }
@@ -135,7 +132,6 @@
       .refresh-label { min-width: 0; }
       .refresh-track { width: 100%; height: 10px; }
       .refresh-time { justify-self: start; white-space: normal; font-size: 0.82rem; line-height: 1.25; }
-      .tracker-tabs { width: 100%; }
       .live-badge { justify-content: center; }
       .proxy-row { grid-template-columns: 1fr; }
       .proxy-row button, .notification-actions button { width: 100%; }
@@ -153,17 +149,12 @@
 <body>
 <main class="container">
 
-  <!-- header with clean SVG logo -->
   <header class="app-header">
     <div class="logo-area">
-      <img id="trackerLogo" class="brand-logo" src="./onre-logo.jpg" alt="Onre logo" />
-      <div class="brand"><h1 id="trackerTitle">Exponent Onre Check</h1><p id="trackerSubtitle"></p></div>
+      <div class="brand-mark" aria-hidden="true">PT</div>
+      <div class="brand"><h1>PT-bulkSOL Buy Tracker</h1><p>Exponent · 31 OCT 2026</p></div>
     </div>
     <div class="header-actions">
-      <div class="tracker-tabs" role="tablist" aria-label="Tracker">
-        <button id="tabOnyc" type="button" role="tab" aria-selected="true" class="tab-btn active" onclick="switchTracker('onyc')">ONyc</button>
-        <button id="tabSolstice" type="button" role="tab" aria-selected="false" class="tab-btn" onclick="switchTracker('solstice')">Solstice</button>
-      </div>
       <div class="live-badge" aria-label="Live monitoring status"><span class="dot-pulse"></span> Live</div>
     </div>
   </header>
@@ -171,8 +162,8 @@
   <section class="config-card" aria-labelledby="configTitle">
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
-      <div class="config-heading">Monitor the latest 20 confirmed movements</div>
-      <p class="config-copy">Connect through the Cloudflare Worker proxy, then keep the feed current with a 30 second refresh cycle.</p>
+      <div class="config-heading">Monitor confirmed PT-bulkSOL purchases</div>
+      <p class="config-copy">Scan the new Exponent contract and keep only BuyPt transactions where the signer spends bulkSOL and receives PT-bulkSOL.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -182,7 +173,7 @@
       <button type="button" class="primary-action" onclick="fetchAll()">Load data</button>
     </div>
     <div class="notice-row">
-      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 30s. <span id="volumeNote">High volume (&gt;5,000 ONyc) gets a special alert, sound, and highlight.</span></div>
+      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 20s. <span id="volumeNote">High volume (&gt;5,000 PT-bulkSOL) gets a special alert, sound, and highlight.</span></div>
       <div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
     <div class="notification-actions" aria-label="Notification controls">
@@ -192,9 +183,9 @@
     </div>
   </section>
 
-  <section class="stats-grid" aria-label="Movement summary">
-    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-number" id="sTx" aria-live="polite">—</div><div class="stat-sub">last 20 signatures</div></div>
-    <div class="stat-card"><div class="stat-label"><span id="volumeLabel">ONyc</span> Volume</div><div class="stat-number" id="sTot" aria-live="polite">—</div><div class="stat-sub">total moved</div></div>
+  <section class="stats-grid" aria-label="Purchase summary">
+    <div class="stat-card"><div class="stat-label">Buy transactions</div><div class="stat-number" id="sTx" aria-live="polite">—</div><div class="stat-sub">latest matching purchases</div></div>
+    <div class="stat-card"><div class="stat-label">PT-bulkSOL Bought</div><div class="stat-number" id="sTot" aria-live="polite">—</div><div class="stat-sub">total received</div></div>
     <div class="stat-card"><div class="stat-label">Active Wallets</div><div class="stat-number" id="sWal" aria-live="polite">—</div><div class="stat-sub">unique signers</div></div>
     <div class="stat-card"><div class="stat-label">Latest Activity</div><div class="stat-number" id="sLat" aria-live="polite">—</div><div class="stat-sub" id="sLatH"></div></div>
   </section>
@@ -211,164 +202,26 @@
     <div class="panel-header">
       <div class="panel-heading">
         <div class="panel-kicker">Activity feed</div>
-        <div class="panel-title" id="panelTitle">ONyc Transactions</div>
+        <div class="panel-title" id="panelTitle">PT-bulkSOL Buy Transactions</div>
       </div>
       <div class="panel-actions">
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
     </div>
-    <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load transactions</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest movement data.</p></div></div></div>
+    <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load purchases</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest PT-bulkSOL buys.</p></div></div></div>
   </section>
-  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span>Free Solana RPC via Cloudflare Worker · alerts on new movement</span></footer>
+  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span>Exponent XPC1…varC · alerts on new PT-bulkSOL buys</span></footer>
 </main>
 
 <script>
-  const PROGRAM = 'ExponentnaRg3CQbW6dqQNZKXp7gtZ9DGMp1cwC4HAS7';
-  const TOKEN_MINTS = {
-    onyc: '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5',
-    ptOnyc: '2W5zZccVq8AMdrg7P4b3NvBKJyzbdnytRy2CKEDHvhiJ',
-    ytOnyc: 'HYHEZZ7GsPZbBfh2JVBxxSmqcqSPtPXPRqp5HJvhwh9Y',
-    lpOnyc: '5srzWfNms2zC2WNAFzMVyc5gVH6FSS9xUyXx22FkghWn',
-    wrappedOnyc: 'G1qbuP11CdquJCzuDjruWqatQAHroajmxhLfeQVgHosF'
+  const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
+  const BULKSOL_MINT = 'BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn';
+  const PT_BULKSOL_MINT = 'HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6';
+  const TRACKER = {
+    name: 'PT-bulkSOL',
+    highVolumeThreshold: 5000
   };
-  const ONYC_TRACKED_TOKENS = [
-    { label: 'ONyc', mint: TOKEN_MINTS.onyc },
-    { label: 'PT-ONyc', mint: TOKEN_MINTS.ptOnyc },
-    { label: 'YT-ONyc', mint: TOKEN_MINTS.ytOnyc },
-    { label: 'LP-ONyc', mint: TOKEN_MINTS.lpOnyc }
-  ];
-  const PT_ONYC_ONYC_POOL_WALLET = 'BmLiVHRb9ppTrEA5jhTgNJ2WFtjUZEkfzJZGswEidxzu';
-  
-  const trackers = {
-    onyc: {
-      name: 'ONyc',
-      title: 'Exponent Onre Check',
-      subtitle: '',
-      logo: './onre-logo.jpg',
-      tokens: ONYC_TRACKED_TOKENS.map(token => token.mint),
-      highVolumeThreshold: 5000,
-      panelTitle: 'ONyc Transactions',
-      volumeNote: 'High volume (>5,000 ONyc) gets a special alert, sound, and highlight.'
-    },
-    solstice: {
-      name: 'Solstice',
-      title: 'Exponent Solstice tracker',
-      subtitle: '',
-      logo: './solstice-logo.png',
-      tokens: ['6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG', '3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC'],
-      highVolumeThreshold: 800,
-      panelTitle: 'Solstice Transactions',
-      volumeNote: 'High volume (>800) gets a special alert, sound, and highlight.'
-    }
-  };
-
-  let currentTracker = 'onyc';
-
-  function switchTracker(tracker) {
-    if (currentTracker === tracker) return;
-    currentTracker = tracker;
-    const cfg = trackers[tracker];
-    document.getElementById('trackerTitle').textContent = cfg.title;
-    document.getElementById('trackerSubtitle').textContent = cfg.subtitle;
-    document.getElementById('trackerLogo').src = cfg.logo;
-    document.getElementById('trackerLogo').alt = `${cfg.name} logo`;
-    document.getElementById('panelTitle').textContent = cfg.panelTitle;
-    document.getElementById('volumeNote').textContent = cfg.volumeNote;
-    document.getElementById('volumeLabel').textContent = cfg.name;
-    document.title = `OnRe × ${cfg.name} Tracker`;
-    document.getElementById('tabOnyc').classList.toggle('active', tracker === 'onyc');
-    document.getElementById('tabSolstice').classList.toggle('active', tracker === 'solstice');
-    document.getElementById('tabOnyc').setAttribute('aria-selected', tracker === 'onyc' ? 'true' : 'false');
-    document.getElementById('tabSolstice').setAttribute('aria-selected', tracker === 'solstice' ? 'true' : 'false');
-    seenSigs = new Set();
-    firstLoad = true;
-    currentTxs = [];
-    updateNotifUI();
-    fetchAll();
-  }
-
-  function getTokenAmount(tx, tokenList) {
-    const meta = tx.meta;
-    const keys = tx.transaction?.message?.accountKeys || [];
-    const signerIdx = keys.findIndex(k => k?.signer === true);
-    if (signerIdx === -1) return 0;
-    const pre = meta?.preTokenBalances || [];
-    const post = meta?.postTokenBalances || [];
-    let signerOut = 0;
-    for (const preBal of pre) {
-      if (!tokenList.includes(preBal.mint)) continue;
-      if (preBal.owner !== keys[signerIdx]?.pubkey) continue;
-      const postBal = post.find(p => p.accountIndex === preBal.accountIndex);
-      const preAmt = preBal.uiTokenAmount?.uiAmount || 0;
-      const postAmt = postBal?.uiTokenAmount?.uiAmount || 0;
-      const delta = postAmt - preAmt;
-      if (delta < 0) signerOut += Math.abs(delta);
-    }
-    if (signerOut > 0) return signerOut;
-    let maxIn = 0;
-    for (const postBal of post) {
-      if (!tokenList.includes(postBal.mint)) continue;
-      const preBal = pre.find(p => p.accountIndex === postBal.accountIndex);
-      const delta = (postBal.uiTokenAmount?.uiAmount||0) - (preBal?.uiTokenAmount?.uiAmount||0);
-      if (delta > maxIn) maxIn = delta;
-    }
-    return maxIn;
-  }
-
-  function getTrackedAmounts(tx) {
-    const amounts = {};
-    for (const token of ONYC_TRACKED_TOKENS) {
-      const value = getTokenAmount(tx, [token.mint]);
-      if (value > 0) amounts[token.label] = value;
-    }
-    return amounts;
-  }
-
-  function getTrackedTokenOrder(tx, amounts, interaction = '') {
-    const mintToLabel = Object.fromEntries(ONYC_TRACKED_TOKENS.map(token => [token.mint, token.label]));
-    const ordered = [];
-    const seen = new Set();
-    const pushMint = mint => {
-      const label = mintToLabel[mint];
-      if (!label) return;
-      if ((amounts[label] || 0) <= 0) return;
-      if (seen.has(label)) return;
-      seen.add(label);
-      ordered.push(label);
-    };
-    const msg = tx.transaction?.message;
-    const outer = msg?.instructions || [];
-    const innerByIndex = new Map((tx.meta?.innerInstructions || []).map(group => [group.index, group.instructions || []]));
-    for (let i = 0; i < outer.length; i++) {
-      const collect = instruction => {
-        const mint = instruction?.parsed?.info?.mint || instruction?.parsed?.info?.tokenMint || '';
-        if (mint) pushMint(mint);
-      };
-      collect(outer[i]);
-      for (const innerIx of (innerByIndex.get(i) || [])) collect(innerIx);
-    }
-    for (const token of ONYC_TRACKED_TOKENS) pushMint(token.mint);
-    if (seen.has('ONyc') && seen.has('PT-ONyc')) {
-      if (interaction === 'Buy PT-ONyc') {
-        return ['ONyc', 'PT-ONyc', ...ordered.filter(label => label !== 'ONyc' && label !== 'PT-ONyc')];
-      }
-      if (interaction === 'Sell PT-ONyc') {
-        return ['PT-ONyc', 'ONyc', ...ordered.filter(label => label !== 'ONyc' && label !== 'PT-ONyc')];
-      }
-    }
-    return ordered;
-  }
-
-  function formatTrackedAmounts(amounts, order = []) {
-    const labels = order.length
-      ? order
-      : ONYC_TRACKED_TOKENS.map(token => token.label);
-    const entries = labels
-      .filter(label => (amounts[label] || 0) > 0)
-      .map(label => `${escapeHtml(label)}: ${escapeHtml(nm(amounts[label]))}`);
-    return entries.length ? entries.join('<br>') : '-';
-  }
 
   function getSignerAddress(tx) {
     const keys = tx.transaction?.message?.accountKeys || [];
@@ -384,45 +237,27 @@
     return postSum - preSum;
   }
 
-  function getOwnerMintDelta(tx, owner, mint) {
-    if (!owner || !mint) return 0;
-    const pre = tx.meta?.preTokenBalances || [];
-    const post = tx.meta?.postTokenBalances || [];
-    const preSum = pre.filter(b => b.owner === owner && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
-    const postSum = post.filter(b => b.owner === owner && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
-    return postSum - preSum;
+  function getPurchaseDetails(tx, signer) {
+    const EPS = 1e-9;
+    const keys = tx.transaction?.message?.accountKeys || [];
+    const logs = tx.meta?.logMessages || [];
+    const invokesProgram = keys.some(key => key?.pubkey === PROGRAM)
+      || logs.some(line => line.includes(`Program ${PROGRAM} invoke`));
+    const isBuyPt = logs.some(line => line.includes('Instruction: BuyPt'));
+    if (!invokesProgram || !isBuyPt) return null;
+
+    const bulkSolDelta = getSignerMintDelta(tx, signer, BULKSOL_MINT);
+    const ptBulkSolDelta = getSignerMintDelta(tx, signer, PT_BULKSOL_MINT);
+    if (bulkSolDelta >= -EPS || ptBulkSolDelta <= EPS) return null;
+
+    return {
+      bulkSpent: Math.abs(bulkSolDelta),
+      ptReceived: ptBulkSolDelta
+    };
   }
 
-  function classifyInteraction(tx, signer) {
-    const EPS = 1e-9;
-    const isPos = value => value > EPS;
-    const isNeg = value => value < -EPS;
-    const wrapped = getSignerMintDelta(tx, signer, TOKEN_MINTS.wrappedOnyc);
-    const lp = getSignerMintDelta(tx, signer, TOKEN_MINTS.lpOnyc);
-    const pt = getSignerMintDelta(tx, signer, TOKEN_MINTS.ptOnyc);
-    const yt = getSignerMintDelta(tx, signer, TOKEN_MINTS.ytOnyc);
-    const signerOnyc = getSignerMintDelta(tx, signer, TOKEN_MINTS.onyc);
-    const poolOnyc = getOwnerMintDelta(tx, PT_ONYC_ONYC_POOL_WALLET, TOKEN_MINTS.onyc);
-
-    const mintWrapped = isPos(wrapped);
-    const burnWrapped = isNeg(wrapped);
-    const mintLp = isPos(lp);
-    const mintPt = isPos(pt);
-    const burnPt = isNeg(pt);
-    const mintYt = isPos(yt);
-    const burnYt = isNeg(yt);
-    const signerOnycOutToPool = isNeg(signerOnyc) && isPos(poolOnyc);
-    const signerOnycInFromPool = isPos(signerOnyc) && isNeg(poolOnyc);
-
-    if (mintWrapped && mintLp && !mintYt) return 'Add LP-ONyc (swap + supply)';
-    if (mintWrapped && mintLp && mintYt) return 'Add LP-ONyc (mint + supply)';
-    if (mintWrapped && mintPt && !mintLp && !mintYt && signerOnycOutToPool) return 'Buy PT-ONyc';
-    if (burnWrapped && burnPt && !mintLp && !mintYt && !burnYt && signerOnycInFromPool) return 'Sell PT-ONyc';
-    if (mintWrapped && mintPt && !mintLp && !mintYt) return 'Buy PT-ONyc';
-    if (burnWrapped && burnPt && !mintLp && !mintYt && !burnYt) return 'Sell PT-ONyc';
-    if (mintWrapped && mintPt && mintYt && !mintLp) return 'Buy YT-ONyc';
-    if (burnWrapped && burnPt && burnYt && !mintLp && !mintPt && !mintYt) return 'Sell YT-ONyc';
-    return 'Other';
+  function formatPurchaseAmounts(tx) {
+    return `${escapeHtml(nm(tx.amount))} PT-bulkSOL<span class="amount-sub">Spent ${escapeHtml(nm(tx.bulkSpent))} bulkSOL</span>`;
   }
 
   function getProxy() { return document.getElementById('proxyUrl').value.trim().replace(/\/$/,''); }
@@ -450,9 +285,9 @@
     const className = kind === 'error' ? 'empty-state error-state' : 'empty-state';
     document.getElementById('txBody').innerHTML = `<div class="${className}" role="${role}"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(msg)}</p></div></div>`;
   }
-  function setLoading(msg) { setStateMessage('Loading transactions', msg); }
+  function setLoading(msg) { setStateMessage('Loading purchases', msg); }
   function setEmpty(msg) {
-    setStateMessage('No matching movements', msg);
+    setStateMessage('No matching purchases', msg);
     ['sTx','sTot','sWal','sLat'].forEach(id=>document.getElementById(id).textContent='—');
     document.getElementById('sLatH').textContent = '';
     document.getElementById('txBadge').textContent='0 txs';
@@ -537,16 +372,17 @@
   let seenSigs = new Set();
   let firstLoad = true;
   let audioContext = null;
-  const notifyState = {
-    onyc: { armed: false, normal: false, high: false },
-    solstice: { armed: false, normal: false, high: false }
-  };
+  const notifyState = { armed: false, normal: false, high: false };
   let currentTxs = [];
-  const TX_FETCH_LIMIT = 20;
+  let fetchInFlight = false;
+  const txCache = new Map();
+  const SIGNATURE_SCAN_LIMIT = 40;
+  const DISPLAY_LIMIT = 20;
+  const FETCH_CONCURRENCY = 8;
   const POLL_INTERVAL_MS = 20000;
 
   function getCurrentNotifyState() {
-    return notifyState[currentTracker] || { armed: false, normal: false, high: false };
+    return notifyState;
   }
 
   function initAudioContext() {
@@ -564,71 +400,98 @@
     }
   }
 
+  async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    async function worker() {
+      while (nextIndex < items.length) {
+        const index = nextIndex++;
+        results[index] = await mapper(items[index], index);
+      }
+    }
+    const workerCount = Math.min(limit, items.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return results;
+  }
+
+  async function getTransactionCached(proxy, signature) {
+    if (txCache.has(signature)) return txCache.get(signature);
+    try {
+      const tx = await rpcCall(proxy, 'getTransaction', [
+        signature,
+        { encoding:'jsonParsed', maxSupportedTransactionVersion:0, commitment:'confirmed' }
+      ]);
+      if (tx) {
+        txCache.set(signature, tx);
+        while (txCache.size > 200) txCache.delete(txCache.keys().next().value);
+      }
+      return tx;
+    } catch (error) {
+      console.warn('Unable to load transaction', signature, error);
+      return null;
+    }
+  }
+
   async function fetchAll(options = {}) {
     const { silent = false } = options;
+    if (fetchInFlight) return;
     const proxy = getProxy();
     if (!proxy) { alert('Enter your Cloudflare Worker URL.'); return; }
+    fetchInFlight = true;
     const btn = document.getElementById('rfBtn');
     if (!silent) {
       btn.disabled = true;
       document.getElementById('rfIcon').style.display = 'inline-block';
       document.getElementById('rfIcon').classList.add('spinning');
-      setLoading('Fetching signatures…');
+      setLoading('Fetching recent contract signatures…');
     }
     try {
-      const sigs = await rpcCall(proxy, 'getSignaturesForAddress', [PROGRAM, {limit:TX_FETCH_LIMIT, commitment:'confirmed'}]);
+      const sigs = await rpcCall(proxy, 'getSignaturesForAddress', [PROGRAM, {limit:SIGNATURE_SCAN_LIMIT, commitment:'confirmed'}]);
       const okSigs = (sigs||[]).filter(s=>!s.err).map(s=>s.signature);
       if (!okSigs.length) { setEmpty('No successful transactions found.'); return; }
-      if (!silent) setLoading(`Loading ${Math.min(okSigs.length,TX_FETCH_LIMIT)} transactions…`);
-      const top = okSigs.slice(0,TX_FETCH_LIMIT);
-      const txs = await Promise.all(top.map(sig => rpcCall(proxy,'getTransaction',[sig,{encoding:'jsonParsed',maxSupportedTransactionVersion:0,commitment:'confirmed'}]).catch(()=>null)));
+      const top = okSigs.slice(0,SIGNATURE_SCAN_LIMIT);
+      if (!silent) setLoading(`Checking ${top.length} recent transactions for PT-bulkSOL buys…`);
+      const txs = await mapWithConcurrency(
+        top,
+        FETCH_CONCURRENCY,
+        signature => getTransactionCached(proxy, signature)
+      );
 
       const results = [];
       for (let i=0; i<txs.length; i++) {
         const tx = txs[i];
         if (!tx) continue;
-        const meta = tx.meta, msg = tx.transaction?.message;
+        const msg = tx.transaction?.message;
         if (!msg) continue;
-        const cfg = trackers[currentTracker];
-        const allBals = [...(meta?.preTokenBalances||[]), ...(meta?.postTokenBalances||[])];
-        if (!allBals.some(b => cfg.tokens.includes(b.mint))) continue;
-        const amounts = currentTracker === 'onyc' ? getTrackedAmounts(tx) : {};
-        const totalTracked = currentTracker === 'onyc'
-          ? Object.values(amounts).reduce((sum, value) => sum + value, 0)
-          : getTokenAmount(tx, cfg.tokens);
-        if (totalTracked <= 0) continue;
         const from = getSignerAddress(tx);
-        const interaction = classifyInteraction(tx, from);
-        const amount = currentTracker === 'onyc' ? (amounts['ONyc'] || 0) : totalTracked;
-        const amountOrder = currentTracker === 'onyc' ? getTrackedTokenOrder(tx, amounts, interaction) : [];
-        results.push({ sig: top[i], ts: tx.blockTime, from, amount, amounts, amountOrder, interaction, isNew: !seenSigs.has(top[i]) });
+        const purchase = getPurchaseDetails(tx, from);
+        if (!purchase) continue;
+        results.push({
+          sig: top[i],
+          ts: tx.blockTime,
+          from,
+          amount: purchase.ptReceived,
+          bulkSpent: purchase.bulkSpent,
+          interaction: 'Buy PT-bulkSOL',
+          isNew: !seenSigs.has(top[i])
+        });
+        if (results.length >= DISPLAY_LIMIT) break;
       }
 
-      if (!firstLoad && 'Notification' in window && Notification.permission === 'granted') {
+      if (!firstLoad && 'Notification' in window && Notification.permission === 'granted' && notifyState.armed) {
         const newOnes = results.filter(r=>r.isNew);
-        const cfg = trackers[currentTracker];
         const trackerNotify = getCurrentNotifyState();
-        if (!trackerNotify.armed) {
-          firstLoad = false;
-          seenSigs = new Set(results.map(r=>r.sig));
-          currentTxs = results;
-          renderTable(results);
-          document.getElementById('lastUpdate').innerText = 'Updated: ' + new Date().toLocaleTimeString();
-          return;
-        }
         for (const tx of newOnes) {
-          const isHigh = tx.amount > cfg.highVolumeThreshold;
+          const isHigh = tx.amount > TRACKER.highVolumeThreshold;
           if (isHigh && trackerNotify.high) {
             playHighVolumeAlert();
-            showBrowserNotification(`High volume ${cfg.name} movement`, {
-              body: `${tx.interaction} - ${nm(tx.amount)} from ${sh(tx.from)} - large transaction`,
-              icon: 'https://www.onre.finance/favicon.ico'
+            showBrowserNotification('High volume PT-bulkSOL buy', {
+              body: `${nm(tx.amount)} PT-bulkSOL received for ${nm(tx.bulkSpent)} bulkSOL from ${sh(tx.from)}`
             });
           } else if (trackerNotify.normal) {
             playAlert();
-            showBrowserNotification(`${cfg.name} movement detected`, {
-              body: `${tx.interaction} - ${nm(tx.amount)} from ${sh(tx.from)} - click to inspect`,
-              icon: 'https://www.onre.finance/favicon.ico'
+            showBrowserNotification('PT-bulkSOL buy detected', {
+              body: `${nm(tx.amount)} PT-bulkSOL received for ${nm(tx.bulkSpent)} bulkSOL from ${sh(tx.from)}`
             });
           }
         }
@@ -648,16 +511,16 @@
         document.getElementById('rfIcon').style.display = '';
         document.getElementById('rfIcon').classList.remove('spinning');
       }
+      fetchInFlight = false;
     }
   }
 
   function renderTable(txs) {
-    const cfg = trackers[currentTracker];
     document.getElementById('sTx').innerText = txs.length;
     document.getElementById('txBadge').innerText = txs.length + ' txs';
     document.getElementById('sWal').innerText = new Set(txs.map(t=>t.from)).size;
     const total = txs.reduce((a,t)=>a+t.amount,0);
-    document.getElementById('sTot').textContent = total ? nm(total) + ' ' + cfg.name : '—';
+    document.getElementById('sTot').textContent = total ? nm(total) + ' PT-bulkSOL' : '—';
     if (txs[0]) {
       document.getElementById('sLat').innerText = ta(txs[0].ts);
       document.getElementById('sLatH').innerText = fd(txs[0].ts);
@@ -665,15 +528,13 @@
       document.getElementById('sLat').innerText = '—';
       document.getElementById('sLatH').innerText = '';
     }
-    if (!txs.length) { setEmpty(`No ${cfg.name} movements in last ${TX_FETCH_LIMIT} tx.`); return; }
+    if (!txs.length) { setEmpty(`No PT-bulkSOL buys found in the latest ${SIGNATURE_SCAN_LIMIT} contract transactions.`); return; }
 
     const mobile = isMobileView();
     if (mobile) {
       const cards = txs.map(tx => {
-        const isHigh = tx.amount > cfg.highVolumeThreshold;
-        const amountDisplay = currentTracker === 'onyc'
-          ? formatTrackedAmounts(tx.amounts || {}, tx.amountOrder || [])
-          : `${escapeHtml(nm(tx.amount))} ${escapeHtml(cfg.name)}`;
+        const isHigh = tx.amount > TRACKER.highVolumeThreshold;
+        const amountDisplay = formatPurchaseAmounts(tx);
         return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Signature</div>
@@ -704,11 +565,9 @@
     }
 
     const rows = txs.map(tx => {
-      const isHigh = tx.amount > cfg.highVolumeThreshold;
+      const isHigh = tx.amount > TRACKER.highVolumeThreshold;
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
-      const amountDisplay = currentTracker === 'onyc'
-        ? formatTrackedAmounts(tx.amounts || {}, tx.amountOrder || [])
-        : `${escapeHtml(nm(tx.amount))} ${escapeHtml(cfg.name)}`;
+      const amountDisplay = formatPurchaseAmounts(tx);
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a></td>
         <td><span class="status-ok">✓ OK</span></td>
@@ -723,7 +582,7 @@
 
     document.getElementById('txBody').innerHTML = `
       <table>
-        <thead><tr><th>Signature</th><th>Status</th><th>Interaction</th><th>Wallet</th><th>${escapeHtml(cfg.name)} Amount</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
+        <thead><tr><th>Signature</th><th>Status</th><th>Interaction</th><th>Wallet</th><th>Amounts</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -848,7 +707,7 @@
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
       banner.style.display = 'flex';
-      banner.innerText = `${trackers[currentTracker].name} alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
+      banner.innerText = `PT-bulkSOL alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
       notifyBtn.classList.remove('is-ready');

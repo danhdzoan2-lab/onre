@@ -45,7 +45,7 @@
     .config-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 7px; font-weight: 800; }
     .config-heading { font-family: 'Space Grotesk', monospace; font-size: 1.18rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
     .config-copy { color: var(--muted); font-size: 0.84rem; max-width: 520px; }
-    .proxy-row { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; align-items: end; }
+    .proxy-row { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(170px, 0.45fr) auto; gap: 10px; align-items: end; }
     .field { display: grid; gap: 6px; }
     .field label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; }
     .proxy-row input { width: 100%; min-width: 0; background: #090b08; border: 1px solid var(--line); border-radius: var(--radius); min-height: 38px; padding: 9px 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; color: var(--text); outline: none; transition: border-color 0.16s ease, box-shadow 0.16s ease; }
@@ -170,10 +170,14 @@
         <label for="proxyUrl">Worker URL</label>
         <input type="url" id="proxyUrl" value="https://wild-night-f072.amazygo1.workers.dev" autocomplete="off" spellcheck="false" />
       </div>
+      <div class="field">
+        <label for="highVolumeThreshold">High volume (PT-bulkSOL)</label>
+        <input type="number" id="highVolumeThreshold" value="5000" min="0.01" step="any" inputmode="decimal" aria-describedby="volumeNote" />
+      </div>
       <button type="button" class="primary-action" onclick="fetchAll()">Load data</button>
     </div>
     <div class="notice-row">
-      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 20s. <span id="volumeNote">High volume (&gt;5,000 PT-bulkSOL) gets a special alert, sound, and highlight.</span></div>
+      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 20s. <span id="volumeNote">Transactions above your High volume threshold get a special alert, sound, and highlight.</span></div>
       <div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
     <div class="notification-actions" aria-label="Notification controls">
@@ -218,10 +222,8 @@
   const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
   const BULKSOL_MINT = 'BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn';
   const PT_BULKSOL_MINT = 'HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6';
-  const TRACKER = {
-    name: 'PT-bulkSOL',
-    highVolumeThreshold: 5000
-  };
+  const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
+  const HIGH_VOLUME_STORAGE_KEY = 'pt-bulksol-high-volume-threshold';
 
   function getSignerAddress(tx) {
     const keys = tx.transaction?.message?.accountKeys || [];
@@ -279,6 +281,38 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
+  }
+  function getHighVolumeThreshold() {
+    const input = document.getElementById('highVolumeThreshold');
+    const value = Number(input?.value);
+    return Number.isFinite(value) && value > 0 ? value : DEFAULT_HIGH_VOLUME_THRESHOLD;
+  }
+  function updateHighVolumeThreshold() {
+    const input = document.getElementById('highVolumeThreshold');
+    const note = document.getElementById('volumeNote');
+    const value = Number(input?.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      note.textContent = 'Enter a High volume threshold greater than 0.';
+      return;
+    }
+    try {
+      localStorage.setItem(HIGH_VOLUME_STORAGE_KEY, String(value));
+    } catch (error) {
+      console.warn('Unable to save High volume threshold', error);
+    }
+    note.textContent = `High volume is above ${nm(value)} PT-bulkSOL. Matching buys get a special alert, sound, and highlight.`;
+    if (currentTxs.length) renderTable(currentTxs);
+  }
+  function initHighVolumeThreshold() {
+    const input = document.getElementById('highVolumeThreshold');
+    try {
+      const savedValue = Number(localStorage.getItem(HIGH_VOLUME_STORAGE_KEY));
+      if (Number.isFinite(savedValue) && savedValue > 0) input.value = String(savedValue);
+    } catch (error) {
+      console.warn('Unable to restore High volume threshold', error);
+    }
+    input.addEventListener('input', updateHighVolumeThreshold);
+    updateHighVolumeThreshold();
   }
   function setStateMessage(title, msg, kind = 'status') {
     const role = kind === 'error' ? 'alert' : 'status';
@@ -482,7 +516,7 @@
         const newOnes = results.filter(r=>r.isNew);
         const trackerNotify = getCurrentNotifyState();
         for (const tx of newOnes) {
-          const isHigh = tx.amount > TRACKER.highVolumeThreshold;
+          const isHigh = tx.amount > getHighVolumeThreshold();
           if (isHigh && trackerNotify.high) {
             playHighVolumeAlert();
             showBrowserNotification('High volume PT-bulkSOL buy', {
@@ -533,7 +567,7 @@
     const mobile = isMobileView();
     if (mobile) {
       const cards = txs.map(tx => {
-        const isHigh = tx.amount > TRACKER.highVolumeThreshold;
+        const isHigh = tx.amount > getHighVolumeThreshold();
         const amountDisplay = formatPurchaseAmounts(tx);
         return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
           <div class="tx-card-row"><div>
@@ -565,7 +599,7 @@
     }
 
     const rows = txs.map(tx => {
-      const isHigh = tx.amount > TRACKER.highVolumeThreshold;
+      const isHigh = tx.amount > getHighVolumeThreshold();
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
       const amountDisplay = formatPurchaseAmounts(tx);
       return `<tr class="${rowClass}">
@@ -742,7 +776,7 @@
   refreshStartedAt = Date.now();
   tickRefreshProgress();
   window.addEventListener('resize', () => { if (currentTxs.length) renderTable(currentTxs); });
-  window.addEventListener('load', async () => { await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
+  window.addEventListener('load', async () => { initHighVolumeThreshold(); await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>
 <style>
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }

@@ -23,6 +23,7 @@ Reference transaction:
 - Scans the latest 40 confirmed contract transactions
 - Shows up to 20 matching PT-bulkSOL buys
 - Displays PT-bulkSOL received and bulkSOL spent
+- Lets each user set and locally save their own high-volume threshold
 - Refreshes every 20 seconds
 - Caches immutable transaction data to reduce RPC traffic
 - Supports regular and high-volume browser alerts
@@ -51,6 +52,6 @@ The main constants are in `index.html`:
 - `SIGNATURE_SCAN_LIMIT`
 - `DISPLAY_LIMIT`
 - `POLL_INTERVAL_MS`
-- `TRACKER.highVolumeThreshold`
+- `DEFAULT_HIGH_VOLUME_THRESHOLD`
 
 No environment variables are required.

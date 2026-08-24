@@ -88,6 +88,8 @@
     .panel-kicker { color: var(--dim); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
     .panel-title { font-weight: 650; font-size: 1.08rem; letter-spacing: 0; color: var(--text); }
     .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .filter-button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #03100b; box-shadow: 0 0 0 2px rgba(0, 214, 143, 0.12); }
+    .filter-button[aria-pressed="true"]:hover { background: #32e2aa; color: #03100b; }
     .tx-badge { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.24); border-radius: var(--radius); padding: 7px 10px; font-size: 0.76rem; font-weight: 750; color: var(--accent); white-space: nowrap; }
     .table-wrapper { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 840px; }
@@ -164,7 +166,7 @@
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
       <div class="config-heading">Monitor every Exponent CLMM transaction</div>
-      <p class="config-copy">Load the latest contract signatures without filtering by market, token, instruction, or transaction status.</p>
+      <p class="config-copy">Load every recent contract signature, then optionally narrow the activity feed to transactions involving ONyc.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -210,6 +212,7 @@
         <div class="panel-title" id="panelTitle">Exponent CLMM Transactions</div>
       </div>
       <div class="panel-actions">
+        <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter by ONyc mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="toggleOnycFilter()">ONyc only</button>
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
@@ -221,10 +224,12 @@
 
 <script>
   const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
+  const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
   const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';
   const RPC_TIMEOUT_MS = 8000;
   const KNOWN_TOKEN_LABELS = {
+    [ONYC_MINT]: 'ONyc',
     BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn: 'bulkSOL',
     HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6: 'PT-bulkSOL',
     Fy7SiHCwMzNMXYgygQhpYvjSg23G8B9TfZm3mHNgy6Bu: 'wBulkSOL'
@@ -254,6 +259,12 @@
       .map(([mint, delta]) => ({ mint, delta, label: KNOWN_TOKEN_LABELS[mint] || sh(mint) }))
       .filter(change => Math.abs(change.delta) > 1e-9)
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  }
+
+  function transactionTouchesMint(tx, mint) {
+    const tokenBalances = [...(tx.meta?.preTokenBalances || []), ...(tx.meta?.postTokenBalances || [])];
+    if (tokenBalances.some(balance => balance.mint === mint)) return true;
+    return (tx.transaction?.message?.accountKeys || []).some(key => (key?.pubkey || key) === mint);
   }
 
   function getProgramInstructions(tx) {
@@ -349,7 +360,7 @@
       console.warn('Unable to save High volume threshold', error);
     }
     note.textContent = `High volume is above ${nm(value)} token units, based on the largest signer token change in each transaction.`;
-    if (currentTxs.length) renderTable(currentTxs);
+    if (currentTxs.length) renderCurrentTransactions();
   }
   function initHighVolumeThreshold() {
     const input = document.getElementById('highVolumeThreshold');
@@ -456,6 +467,7 @@
   let audioContext = null;
   const notifyState = { armed: false, normal: false, high: false };
   let currentTxs = [];
+  let onycOnly = false;
   let fetchInFlight = false;
   const txCache = new Map();
   const SIGNATURE_SCAN_LIMIT = 20;
@@ -465,6 +477,20 @@
 
   function getCurrentNotifyState() {
     return notifyState;
+  }
+
+  function renderCurrentTransactions() {
+    const visibleTxs = onycOnly ? currentTxs.filter(tx => tx.isOnycRelated) : currentTxs;
+    renderTable(visibleTxs);
+  }
+
+  function toggleOnycFilter() {
+    onycOnly = !onycOnly;
+    const button = document.getElementById('onycFilterBtn');
+    button.setAttribute('aria-pressed', String(onycOnly));
+    button.textContent = onycOnly ? '✓ ONyc only' : 'ONyc only';
+    document.getElementById('panelTitle').textContent = onycOnly ? 'ONyc Transactions' : 'Exponent CLMM Transactions';
+    renderCurrentTransactions();
   }
 
   function initAudioContext() {
@@ -550,6 +576,7 @@
             changes: [],
             interaction: 'Details unavailable',
             success: !top[i].err,
+            isOnycRelated: false,
             isNew: !seenSigs.has(top[i].signature)
           });
           continue;
@@ -566,6 +593,7 @@
           changes,
           interaction: getProgramInstructions(tx),
           success: !tx.meta?.err,
+          isOnycRelated: transactionTouchesMint(tx, ONYC_MINT),
           isNew: !seenSigs.has(top[i].signature)
         });
         if (results.length >= DISPLAY_LIMIT) break;
@@ -592,7 +620,7 @@
       firstLoad = false;
       seenSigs = new Set(results.map(r=>r.sig));
       currentTxs = results;
-      renderTable(results);
+      renderCurrentTransactions();
       document.getElementById('lastUpdate').innerText = 'Updated: ' + new Date().toLocaleTimeString();
       document.getElementById('refreshTime').textContent = 'Last updated ' + new Date().toLocaleTimeString();
     } catch(e) {
@@ -610,7 +638,7 @@
 
   function renderTable(txs) {
     document.getElementById('sTx').innerText = txs.length;
-    document.getElementById('txBadge').innerText = txs.length + ' txs';
+    document.getElementById('txBadge').innerText = txs.length + (onycOnly ? ' ONyc txs' : ' txs');
     document.getElementById('sWal').innerText = new Set(txs.map(tx => tx.from).filter(Boolean)).size;
     const instructionTypes = new Set(
       txs.flatMap(tx => (tx.interaction || '').split(' · '))
@@ -624,7 +652,15 @@
       document.getElementById('sLat').innerText = '—';
       document.getElementById('sLatH').innerText = '';
     }
-    if (!txs.length) { setEmpty('No contract transactions could be loaded.'); return; }
+    if (!txs.length) {
+      setStateMessage(
+        onycOnly ? 'No ONyc transactions' : 'No contract transactions',
+        onycOnly
+          ? `No transaction involving ONyc was found in the latest ${SIGNATURE_SCAN_LIMIT} contract signatures.`
+          : 'No contract transactions could be loaded.'
+      );
+      return;
+    }
 
     const mobile = isMobileView();
     if (mobile) {
@@ -841,7 +877,7 @@
   setInterval(tickRefreshProgress, 1000);
   refreshStartedAt = Date.now();
   tickRefreshProgress();
-  window.addEventListener('resize', () => { if (currentTxs.length) renderTable(currentTxs); });
+  window.addEventListener('resize', () => { if (currentTxs.length) renderCurrentTransactions(); });
   window.addEventListener('load', async () => { initHighVolumeThreshold(); await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>
 <style>

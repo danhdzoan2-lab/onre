@@ -166,7 +166,7 @@
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
       <div class="config-heading">Monitor every Exponent CLMM transaction</div>
-      <p class="config-copy">Load every recent contract signature, then optionally narrow the activity feed to transactions involving ONyc.</p>
+      <p class="config-copy">Load every recent contract signature, then optionally narrow both the activity feed and alerts to transactions involving ONyc.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -212,7 +212,7 @@
         <div class="panel-title" id="panelTitle">Exponent CLMM Transactions</div>
       </div>
       <div class="panel-actions">
-        <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter by ONyc mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="toggleOnycFilter()">ONyc only</button>
+        <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by ONyc mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="toggleOnycFilter()">ONyc only</button>
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
@@ -484,6 +484,10 @@
     renderTable(visibleTxs);
   }
 
+  function shouldNotifyTransaction(tx) {
+    return tx.isNew && (!onycOnly || tx.isOnycRelated);
+  }
+
   function toggleOnycFilter() {
     onycOnly = !onycOnly;
     const button = document.getElementById('onycFilterBtn');
@@ -491,6 +495,7 @@
     button.textContent = onycOnly ? '✓ ONyc only' : 'ONyc only';
     document.getElementById('panelTitle').textContent = onycOnly ? 'ONyc Transactions' : 'Exponent CLMM Transactions';
     renderCurrentTransactions();
+    updateNotifUI();
   }
 
   function initAudioContext() {
@@ -600,7 +605,7 @@
       }
 
       if (!firstLoad && 'Notification' in window && Notification.permission === 'granted' && notifyState.armed) {
-        const newOnes = results.filter(r=>r.isNew);
+        const newOnes = results.filter(shouldNotifyTransaction);
         const trackerNotify = getCurrentNotifyState();
         for (const tx of newOnes) {
           const isHigh = tx.amount > getHighVolumeThreshold();
@@ -843,7 +848,7 @@
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
       banner.style.display = 'flex';
-      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
+      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${onycOnly ? 'ONyc only' : 'All transactions'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
       notifyBtn.classList.remove('is-ready');

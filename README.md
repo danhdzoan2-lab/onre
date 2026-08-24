@@ -14,7 +14,7 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 - Decodes the primary Exponent instruction from program logs
 - Displays signer-owned SPL token balance changes for any mint
 - Shows successful and failed transaction status
-- Provides an ONyc-only button for mint `5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5`
+- Provides an ONyc-only button that filters both the feed and notifications for mint `5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5`
 - Lets each user set and locally save a high-volume threshold
 - Refreshes every 20 seconds
 - Caches immutable transaction data to reduce RPC traffic

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Exponent | PT-bulkSOL Buy Tracker</title>
+  <title>Exponent CLMM | Contract Transaction Tracker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -102,6 +102,7 @@
     .amount { font-weight: 700; color: var(--amber); }
     .amount-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; font-weight: 500; }
     .status-ok { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.2); border-radius: var(--radius); padding: 3px 8px; font-size: 0.7rem; font-weight: 800; color: var(--accent); display: inline-block; }
+    .status-failed { background: rgba(255, 107, 95, 0.1); border: 1px solid rgba(255, 107, 95, 0.24); border-radius: var(--radius); padding: 3px 8px; font-size: 0.7rem; font-weight: 800; color: var(--danger); display: inline-block; }
     .empty-state { min-height: 240px; display: grid; place-items: center; text-align: center; padding: 44px 20px; color: var(--muted); }
     .empty-state strong { display: block; color: var(--text); font-size: 1rem; margin-bottom: 6px; }
     .empty-state p { max-width: 440px; font-size: 0.86rem; }
@@ -151,8 +152,8 @@
 
   <header class="app-header">
     <div class="logo-area">
-      <div class="brand-mark" aria-hidden="true">PT</div>
-      <div class="brand"><h1>PT-bulkSOL Buy Tracker</h1><p>Exponent · 31 OCT 2026</p></div>
+      <div class="brand-mark" aria-hidden="true">XPC</div>
+      <div class="brand"><h1>Exponent CLMM Tracker</h1><p>All contract transactions · Solana</p></div>
     </div>
     <div class="header-actions">
       <div class="live-badge" aria-label="Live monitoring status"><span class="dot-pulse"></span> Live</div>
@@ -162,8 +163,8 @@
   <section class="config-card" aria-labelledby="configTitle">
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
-      <div class="config-heading">Monitor confirmed PT-bulkSOL purchases</div>
-      <p class="config-copy">Scan the new Exponent contract and keep only BuyPt transactions where the signer spends bulkSOL and receives PT-bulkSOL.</p>
+      <div class="config-heading">Monitor every Exponent CLMM transaction</div>
+      <p class="config-copy">Load the latest contract signatures without filtering by market, token, instruction, or transaction status.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -171,13 +172,13 @@
         <input type="url" id="proxyUrl" value="https://wild-night-f072.amazygo1.workers.dev" autocomplete="off" spellcheck="false" />
       </div>
       <div class="field">
-        <label for="highVolumeThreshold">High volume (PT-bulkSOL)</label>
+        <label for="highVolumeThreshold">High volume (token units)</label>
         <input type="number" id="highVolumeThreshold" value="5000" min="0.01" step="any" inputmode="decimal" aria-describedby="volumeNote" />
       </div>
       <button type="button" class="primary-action" onclick="fetchAll()">Load data</button>
     </div>
     <div class="notice-row">
-      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 20s. <span id="volumeNote">Transactions above your High volume threshold get a special alert, sound, and highlight.</span></div>
+      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 20s. <span id="volumeNote">High volume compares the largest signer token change in each transaction.</span></div>
       <div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
     <div class="notification-actions" aria-label="Notification controls">
@@ -187,9 +188,9 @@
     </div>
   </section>
 
-  <section class="stats-grid" aria-label="Purchase summary">
-    <div class="stat-card"><div class="stat-label">Buy transactions</div><div class="stat-number" id="sTx" aria-live="polite">—</div><div class="stat-sub">latest matching purchases</div></div>
-    <div class="stat-card"><div class="stat-label">PT-bulkSOL Bought</div><div class="stat-number" id="sTot" aria-live="polite">—</div><div class="stat-sub">total received</div></div>
+  <section class="stats-grid" aria-label="Contract activity summary">
+    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-number" id="sTx" aria-live="polite">—</div><div class="stat-sub">latest contract signatures</div></div>
+    <div class="stat-card"><div class="stat-label">Instruction Types</div><div class="stat-number" id="sTot" aria-live="polite">—</div><div class="stat-sub">unique decoded actions</div></div>
     <div class="stat-card"><div class="stat-label">Active Wallets</div><div class="stat-number" id="sWal" aria-live="polite">—</div><div class="stat-sub">unique signers</div></div>
     <div class="stat-card"><div class="stat-label">Latest Activity</div><div class="stat-number" id="sLat" aria-live="polite">—</div><div class="stat-sub" id="sLatH"></div></div>
   </section>
@@ -206,68 +207,115 @@
     <div class="panel-header">
       <div class="panel-heading">
         <div class="panel-kicker">Activity feed</div>
-        <div class="panel-title" id="panelTitle">PT-bulkSOL Buy Transactions</div>
+        <div class="panel-title" id="panelTitle">Exponent CLMM Transactions</div>
       </div>
       <div class="panel-actions">
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
     </div>
-    <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load purchases</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest PT-bulkSOL buys.</p></div></div></div>
+    <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load transactions</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest Exponent CLMM activity.</p></div></div></div>
   </section>
-  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span>Exponent XPC1…varC · alerts on new PT-bulkSOL buys</span></footer>
+  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span>Exponent CLMM XPC1…varC · all contract activity</span></footer>
 </main>
 
 <script>
   const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
-  const BULKSOL_MINT = 'BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn';
-  const PT_BULKSOL_MINT = 'HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6';
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
-  const HIGH_VOLUME_STORAGE_KEY = 'pt-bulksol-high-volume-threshold';
+  const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';
+  const RPC_TIMEOUT_MS = 8000;
+  const KNOWN_TOKEN_LABELS = {
+    BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn: 'bulkSOL',
+    HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6: 'PT-bulkSOL',
+    Fy7SiHCwMzNMXYgygQhpYvjSg23G8B9TfZm3mHNgy6Bu: 'wBulkSOL'
+  };
 
   function getSignerAddress(tx) {
     const keys = tx.transaction?.message?.accountKeys || [];
     return (keys.find(k => k?.signer === true)?.pubkey) || keys[0]?.pubkey || '';
   }
 
-  function getSignerMintDelta(tx, signer, mint) {
-    if (!signer || !mint) return 0;
+  function getSignerTokenChanges(tx, signer) {
+    if (!signer) return [];
     const pre = tx.meta?.preTokenBalances || [];
     const post = tx.meta?.postTokenBalances || [];
-    const preSum = pre.filter(b => b.owner === signer && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
-    const postSum = post.filter(b => b.owner === signer && b.mint === mint).reduce((sum, b) => sum + (b.uiTokenAmount?.uiAmount || 0), 0);
-    return postSum - preSum;
-  }
-
-  function getPurchaseDetails(tx, signer) {
-    const EPS = 1e-9;
-    const keys = tx.transaction?.message?.accountKeys || [];
-    const logs = tx.meta?.logMessages || [];
-    const invokesProgram = keys.some(key => key?.pubkey === PROGRAM)
-      || logs.some(line => line.includes(`Program ${PROGRAM} invoke`));
-    const isBuyPt = logs.some(line => line.includes('Instruction: BuyPt'));
-    if (!invokesProgram || !isBuyPt) return null;
-
-    const bulkSolDelta = getSignerMintDelta(tx, signer, BULKSOL_MINT);
-    const ptBulkSolDelta = getSignerMintDelta(tx, signer, PT_BULKSOL_MINT);
-    if (bulkSolDelta >= -EPS || ptBulkSolDelta <= EPS) return null;
-
-    return {
-      bulkSpent: Math.abs(bulkSolDelta),
-      ptReceived: ptBulkSolDelta
+    const balances = new Map();
+    const add = (rows, direction) => {
+      for (const row of rows) {
+        if (row.owner !== signer || !row.mint) continue;
+        const amount = Number(row.uiTokenAmount?.uiAmountString ?? row.uiTokenAmount?.uiAmount ?? 0);
+        if (!Number.isFinite(amount)) continue;
+        balances.set(row.mint, (balances.get(row.mint) || 0) + direction * amount);
+      }
     };
+    add(pre, -1);
+    add(post, 1);
+    return [...balances.entries()]
+      .map(([mint, delta]) => ({ mint, delta, label: KNOWN_TOKEN_LABELS[mint] || sh(mint) }))
+      .filter(change => Math.abs(change.delta) > 1e-9)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   }
 
-  function formatPurchaseAmounts(tx) {
-    return `${escapeHtml(nm(tx.amount))} PT-bulkSOL<span class="amount-sub">Spent ${escapeHtml(nm(tx.bulkSpent))} bulkSOL</span>`;
+  function getProgramInstructions(tx) {
+    const logs = tx.meta?.logMessages || [];
+    const stack = [];
+    const instructions = [];
+    for (const line of logs) {
+      const invoke = line.match(/^Program (\S+) invoke \[(\d+)\]$/);
+      if (invoke) {
+        const depth = Number(invoke[2]);
+        stack.length = depth;
+        stack[depth - 1] = invoke[1];
+        continue;
+      }
+      const instruction = line.match(/^Program log: Instruction: (.+)$/);
+      if (instruction && stack.at(-1) === PROGRAM && !instructions.includes(instruction[1])) {
+        instructions.push(instruction[1]);
+        continue;
+      }
+      const completed = line.match(/^Program (\S+) (?:success|failed)/);
+      if (completed) {
+        const index = stack.lastIndexOf(completed[1]);
+        if (index !== -1) stack.length = index;
+      }
+    }
+    return instructions.length ? instructions.join(' · ') : 'Contract interaction';
+  }
+
+  function formatTokenChanges(tx) {
+    if (!tx.changes?.length) return '<span class="amount-sub">No signer token change</span>';
+    const visible = tx.changes.slice(0, 3).map(change => {
+      const sign = change.delta > 0 ? '+' : '−';
+      return `${sign}${escapeHtml(nm(Math.abs(change.delta)))} ${escapeHtml(change.label)}`;
+    });
+    if (tx.changes.length > 3) visible.push(`<span class="amount-sub">+${tx.changes.length - 3} more token change${tx.changes.length - 3 === 1 ? '' : 's'}</span>`);
+    return visible.join('<br>');
+  }
+
+  function formatPrimaryChange(tx) {
+    const change = tx.changes?.[0];
+    if (!change) return 'No signer token change';
+    return `${change.delta > 0 ? '+' : '−'}${nm(Math.abs(change.delta))} ${change.label}`;
   }
 
   function getProxy() { return document.getElementById('proxyUrl').value.trim().replace(/\/$/,''); }
   async function rpcCall(proxy, method, params) {
-    const res = await fetch(proxy, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ jsonrpc:'2.0', id:1, method, params }) });
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message);
-    return json.result;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
+    try {
+      const res = await fetch(proxy, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ jsonrpc:'2.0', id:1, method, params }),
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error(`RPC request failed (${res.status})`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      return json.result;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function ta(ts) { if (!ts) return '—'; const d = Math.floor(Date.now()/1000)-ts; if (d<60) return d+'s ago'; if (d<3600) return Math.floor(d/60)+'m ago'; if (d<86400) return Math.floor(d/3600)+'h ago'; return Math.floor(d/86400)+'d ago'; }
@@ -300,7 +348,7 @@
     } catch (error) {
       console.warn('Unable to save High volume threshold', error);
     }
-    note.textContent = `High volume is above ${nm(value)} PT-bulkSOL. Matching buys get a special alert, sound, and highlight.`;
+    note.textContent = `High volume is above ${nm(value)} token units, based on the largest signer token change in each transaction.`;
     if (currentTxs.length) renderTable(currentTxs);
   }
   function initHighVolumeThreshold() {
@@ -319,9 +367,9 @@
     const className = kind === 'error' ? 'empty-state error-state' : 'empty-state';
     document.getElementById('txBody').innerHTML = `<div class="${className}" role="${role}"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(msg)}</p></div></div>`;
   }
-  function setLoading(msg) { setStateMessage('Loading purchases', msg); }
+  function setLoading(msg) { setStateMessage('Loading transactions', msg); }
   function setEmpty(msg) {
-    setStateMessage('No matching purchases', msg);
+    setStateMessage('No contract transactions', msg);
     ['sTx','sTot','sWal','sLat'].forEach(id=>document.getElementById(id).textContent='—');
     document.getElementById('sLatH').textContent = '';
     document.getElementById('txBadge').textContent='0 txs';
@@ -410,9 +458,9 @@
   let currentTxs = [];
   let fetchInFlight = false;
   const txCache = new Map();
-  const SIGNATURE_SCAN_LIMIT = 40;
+  const SIGNATURE_SCAN_LIMIT = 20;
   const DISPLAY_LIMIT = 20;
-  const FETCH_CONCURRENCY = 8;
+  const FETCH_CONCURRENCY = 4;
   const POLL_INTERVAL_MS = 20000;
 
   function getCurrentNotifyState() {
@@ -481,33 +529,44 @@
     }
     try {
       const sigs = await rpcCall(proxy, 'getSignaturesForAddress', [PROGRAM, {limit:SIGNATURE_SCAN_LIMIT, commitment:'confirmed'}]);
-      const okSigs = (sigs||[]).filter(s=>!s.err).map(s=>s.signature);
-      if (!okSigs.length) { setEmpty('No successful transactions found.'); return; }
-      const top = okSigs.slice(0,SIGNATURE_SCAN_LIMIT);
-      if (!silent) setLoading(`Checking ${top.length} recent transactions for PT-bulkSOL buys…`);
+      const top = (sigs || []).slice(0, SIGNATURE_SCAN_LIMIT);
+      if (!top.length) { setEmpty('No transactions found for this contract.'); return; }
+      if (!silent) setLoading(`Loading ${top.length} recent Exponent CLMM transactions…`);
       const txs = await mapWithConcurrency(
         top,
         FETCH_CONCURRENCY,
-        signature => getTransactionCached(proxy, signature)
+        item => getTransactionCached(proxy, item.signature)
       );
 
       const results = [];
       for (let i=0; i<txs.length; i++) {
         const tx = txs[i];
-        if (!tx) continue;
+        if (!tx) {
+          results.push({
+            sig: top[i].signature,
+            ts: top[i].blockTime,
+            from: '',
+            amount: 0,
+            changes: [],
+            interaction: 'Details unavailable',
+            success: !top[i].err,
+            isNew: !seenSigs.has(top[i].signature)
+          });
+          continue;
+        }
         const msg = tx.transaction?.message;
         if (!msg) continue;
         const from = getSignerAddress(tx);
-        const purchase = getPurchaseDetails(tx, from);
-        if (!purchase) continue;
+        const changes = getSignerTokenChanges(tx, from);
         results.push({
-          sig: top[i],
+          sig: top[i].signature,
           ts: tx.blockTime,
           from,
-          amount: purchase.ptReceived,
-          bulkSpent: purchase.bulkSpent,
-          interaction: 'Buy PT-bulkSOL',
-          isNew: !seenSigs.has(top[i])
+          amount: changes[0] ? Math.abs(changes[0].delta) : 0,
+          changes,
+          interaction: getProgramInstructions(tx),
+          success: !tx.meta?.err,
+          isNew: !seenSigs.has(top[i].signature)
         });
         if (results.length >= DISPLAY_LIMIT) break;
       }
@@ -519,13 +578,13 @@
           const isHigh = tx.amount > getHighVolumeThreshold();
           if (isHigh && trackerNotify.high) {
             playHighVolumeAlert();
-            showBrowserNotification('High volume PT-bulkSOL buy', {
-              body: `${nm(tx.amount)} PT-bulkSOL received for ${nm(tx.bulkSpent)} bulkSOL from ${sh(tx.from)}`
+            showBrowserNotification(`High volume Exponent CLMM transaction`, {
+              body: `${tx.interaction} · ${formatPrimaryChange(tx)} · ${sh(tx.from)}`
             });
           } else if (trackerNotify.normal) {
             playAlert();
-            showBrowserNotification('PT-bulkSOL buy detected', {
-              body: `${nm(tx.amount)} PT-bulkSOL received for ${nm(tx.bulkSpent)} bulkSOL from ${sh(tx.from)}`
+            showBrowserNotification(`Exponent CLMM transaction ${tx.success ? 'confirmed' : 'failed'}`, {
+              body: `${tx.interaction} · ${formatPrimaryChange(tx)} · ${sh(tx.from)}`
             });
           }
         }
@@ -552,9 +611,12 @@
   function renderTable(txs) {
     document.getElementById('sTx').innerText = txs.length;
     document.getElementById('txBadge').innerText = txs.length + ' txs';
-    document.getElementById('sWal').innerText = new Set(txs.map(t=>t.from)).size;
-    const total = txs.reduce((a,t)=>a+t.amount,0);
-    document.getElementById('sTot').textContent = total ? nm(total) + ' PT-bulkSOL' : '—';
+    document.getElementById('sWal').innerText = new Set(txs.map(tx => tx.from).filter(Boolean)).size;
+    const instructionTypes = new Set(
+      txs.flatMap(tx => (tx.interaction || '').split(' · '))
+        .filter(name => name && name !== 'Contract interaction' && name !== 'Details unavailable')
+    );
+    document.getElementById('sTot').textContent = instructionTypes.size || '—';
     if (txs[0]) {
       document.getElementById('sLat').innerText = ta(txs[0].ts);
       document.getElementById('sLatH').innerText = fd(txs[0].ts);
@@ -562,20 +624,22 @@
       document.getElementById('sLat').innerText = '—';
       document.getElementById('sLatH').innerText = '';
     }
-    if (!txs.length) { setEmpty(`No PT-bulkSOL buys found in the latest ${SIGNATURE_SCAN_LIMIT} contract transactions.`); return; }
+    if (!txs.length) { setEmpty('No contract transactions could be loaded.'); return; }
 
     const mobile = isMobileView();
     if (mobile) {
       const cards = txs.map(tx => {
         const isHigh = tx.amount > getHighVolumeThreshold();
-        const amountDisplay = formatPurchaseAmounts(tx);
+        const amountDisplay = formatTokenChanges(tx);
+        const statusClass = tx.success ? 'status-ok' : 'status-failed';
+        const statusLabel = tx.success ? '✓ OK' : '× Failed';
         return `<div class="tx-card ${isHigh ? 'high-volume' : ''}">
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Signature</div>
             <a class="tx-card-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a>
-          </div><div><span class="status-ok">✓ OK</span></div></div>
+          </div><div><span class="${statusClass}">${statusLabel}</span></div></div>
           <div class="tx-card-row"><div>
-            <div class="tx-card-label">Amount</div>
+            <div class="tx-card-label">Signer token changes</div>
             <div class="tx-card-value amount">${amountDisplay}</div>
           </div><div>
             <div class="tx-card-label">Age</div>
@@ -601,10 +665,12 @@
     const rows = txs.map(tx => {
       const isHigh = tx.amount > getHighVolumeThreshold();
       const rowClass = `${tx.isNew ? 'new-row' : ''} ${isHigh ? 'high-volume' : ''}`.trim();
-      const amountDisplay = formatPurchaseAmounts(tx);
+      const amountDisplay = formatTokenChanges(tx);
+      const statusClass = tx.success ? 'status-ok' : 'status-failed';
+      const statusLabel = tx.success ? '✓ OK' : '× Failed';
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a></td>
-        <td><span class="status-ok">✓ OK</span></td>
+        <td><span class="${statusClass}">${statusLabel}</span></td>
         <td>${escapeHtml(tx.interaction || 'Other')}</td>
         <td class="wallet-addr" title="${escapeHtml(tx.from)}">${escapeHtml(sh(tx.from))}</td>
         <td class="amount">${amountDisplay}</td>
@@ -616,7 +682,7 @@
 
     document.getElementById('txBody').innerHTML = `
       <table>
-        <thead><tr><th>Signature</th><th>Status</th><th>Interaction</th><th>Wallet</th><th>Amounts</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
+        <thead><tr><th>Signature</th><th>Status</th><th>Instruction</th><th>Signer</th><th>Signer Token Changes</th><th>Age</th><th>Timestamp</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -741,7 +807,7 @@
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
       banner.style.display = 'flex';
-      banner.innerText = `PT-bulkSOL alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
+      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
       notifyBtn.classList.remove('is-ready');

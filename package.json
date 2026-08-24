@@ -1,14 +1,14 @@
 {
-  "name": "pt-bulksol-buy-tracker",
+  "name": "exponent-clmm-transaction-tracker",
   "version": "1.0.0",
-  "description": "Real-time PT-bulkSOL buy tracker for the Exponent XPC contract via Solana RPC",
+  "description": "Real-time tracker for every transaction on the Exponent CLMM contract via Solana RPC",
   "author": "OnRe",
   "license": "MIT",
   "keywords": [
     "solana",
     "tracker",
-    "bulksol",
-    "pt-bulksol",
+    "clmm",
+    "transactions",
     "exponent",
     "real-time"
   ],

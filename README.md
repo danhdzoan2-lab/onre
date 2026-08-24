@@ -1,34 +1,27 @@
-# Exponent PT-bulkSOL Buy Tracker
+# Exponent CLMM Transaction Tracker
 
-A real-time dashboard for confirmed PT-bulkSOL purchases on Solana. It scans the Exponent XPC contract, then keeps only transactions that:
+A real-time dashboard for all transactions involving the Exponent CLMM contract on Solana.
 
-- invoke the `BuyPt` instruction;
-- decrease the signer's bulkSOL balance; and
-- increase the signer's PT-bulkSOL balance.
+## Tracked contract
 
-This combination excludes other PT markets and non-purchase activity handled by the same contract.
+`XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC`
 
-## Tracked addresses
-
-- Exponent contract: `XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC`
-- bulkSOL mint: `BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn`
-- PT-bulkSOL mint: `HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6`
-
-Reference transaction:
-
-`2UfAWVpkDSSrzkwdQaQkadQrfYzq3KaL4UtyhSXm27zdycQ3LHSLaxSrjXaSQpzjFr71oetCVvmNLMZxrxvbEFoP`
+The tracker does not filter by PT market, token mint, instruction, or transaction result. It displays the latest 20 contract signatures, including successful and failed transactions.
 
 ## Features
 
-- Scans the latest 40 confirmed contract transactions
-- Shows up to 20 matching PT-bulkSOL buys
-- Displays PT-bulkSOL received and bulkSOL spent
-- Lets each user set and locally save their own high-volume threshold
+- Shows every recent Exponent CLMM transaction
+- Decodes the primary Exponent instruction from program logs
+- Displays signer-owned SPL token balance changes for any mint
+- Shows successful and failed transaction status
+- Lets each user set and locally save a high-volume threshold
 - Refreshes every 20 seconds
 - Caches immutable transaction data to reduce RPC traffic
 - Supports regular and high-volume browser alerts
 - Links every result to Solscan
 - Responsive desktop and mobile layouts
+
+High volume is calculated from the largest absolute signer token change in a transaction. Token units are not normalized across different assets.
 
 ## Local development
 
@@ -47,8 +40,6 @@ The repository is a static Vercel site. Pushing an update to the connected produ
 The main constants are in `index.html`:
 
 - `PROGRAM`
-- `BULKSOL_MINT`
-- `PT_BULKSOL_MINT`
 - `SIGNATURE_SCAN_LIMIT`
 - `DISPLAY_LIMIT`
 - `POLL_INTERVAL_MS`

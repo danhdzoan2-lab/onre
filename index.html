@@ -87,7 +87,8 @@
     .panel-heading { display: grid; gap: 2px; min-width: 0; }
     .panel-kicker { color: var(--dim); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
     .panel-title { font-weight: 650; font-size: 1.08rem; letter-spacing: 0; color: var(--text); }
-    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .asset-filter-group { display: flex; align-items: center; gap: 6px; }
     .filter-button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #03100b; box-shadow: 0 0 0 2px rgba(0, 214, 143, 0.12); }
     .filter-button[aria-pressed="true"]:hover { background: #32e2aa; color: #03100b; }
     .tx-badge { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.24); border-radius: var(--radius); padding: 7px 10px; font-size: 0.76rem; font-weight: 750; color: var(--accent); white-space: nowrap; }
@@ -143,6 +144,8 @@
       .panel-header { align-items: stretch; flex-direction: column; }
       .panel-actions { justify-content: space-between; }
       .panel-actions button { flex: 1; }
+      .asset-filter-group { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+      .asset-filter-group button { min-width: 0; padding-inline: 8px; }
       .table-wrapper { overflow-x: hidden; }
       table { min-width: 0; }
       .footer { flex-direction: column; }
@@ -166,7 +169,7 @@
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
       <div class="config-heading">Monitor every Exponent CLMM transaction</div>
-      <p class="config-copy">Load every recent contract signature, then optionally narrow both the activity feed and alerts to transactions involving ONyc.</p>
+      <p class="config-copy">Load every recent contract signature, then optionally narrow both the activity feed and alerts to ONyc (OnRe), STRCx, or either asset together.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -212,7 +215,12 @@
         <div class="panel-title" id="panelTitle">Exponent CLMM Transactions</div>
       </div>
       <div class="panel-actions">
-        <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by ONyc mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="toggleOnycFilter()">ONyc only</button>
+        <div class="asset-filter-group" role="group" aria-label="Asset filter">
+          <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
+          <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by ONyc (OnRe) mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="setAssetFilter('onyc')">ONyc</button>
+          <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by STRCx mint Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH" onclick="setAssetFilter('strcx')">STRCx</button>
+          <button id="bothFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Show transactions involving either ONyc or STRCx" onclick="setAssetFilter('both')">Both</button>
+        </div>
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
@@ -225,11 +233,13 @@
 <script>
   const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
   const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
+  const STRCX_MINT = 'Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH';
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
   const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';
   const RPC_TIMEOUT_MS = 8000;
   const KNOWN_TOKEN_LABELS = {
     [ONYC_MINT]: 'ONyc',
+    [STRCX_MINT]: 'STRCx',
     BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn: 'bulkSOL',
     HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6: 'PT-bulkSOL',
     Fy7SiHCwMzNMXYgygQhpYvjSg23G8B9TfZm3mHNgy6Bu: 'wBulkSOL'
@@ -467,7 +477,7 @@
   let audioContext = null;
   const notifyState = { armed: false, normal: false, high: false };
   let currentTxs = [];
-  let onycOnly = false;
+  let assetFilter = 'all';
   let fetchInFlight = false;
   const txCache = new Map();
   const SIGNATURE_SCAN_LIMIT = 20;
@@ -479,21 +489,36 @@
     return notifyState;
   }
 
+  function transactionMatchesAssetFilter(tx) {
+    if (assetFilter === 'onyc') return tx.isOnycRelated;
+    if (assetFilter === 'strcx') return tx.isStrcxRelated;
+    if (assetFilter === 'both') return tx.isOnycRelated || tx.isStrcxRelated;
+    return true;
+  }
+
+  function getAssetFilterCopy() {
+    if (assetFilter === 'onyc') return { title: 'ONyc Transactions', scope: 'ONyc only', badge: 'ONyc txs', empty: 'ONyc' };
+    if (assetFilter === 'strcx') return { title: 'STRCx Transactions', scope: 'STRCx only', badge: 'STRCx txs', empty: 'STRCx' };
+    if (assetFilter === 'both') return { title: 'ONyc + STRCx Transactions', scope: 'ONyc or STRCx', badge: 'ONyc / STRCx txs', empty: 'ONyc or STRCx' };
+    return { title: 'Exponent CLMM Transactions', scope: 'All transactions', badge: 'txs', empty: '' };
+  }
+
   function renderCurrentTransactions() {
-    const visibleTxs = onycOnly ? currentTxs.filter(tx => tx.isOnycRelated) : currentTxs;
+    const visibleTxs = currentTxs.filter(transactionMatchesAssetFilter);
     renderTable(visibleTxs);
   }
 
   function shouldNotifyTransaction(tx) {
-    return tx.isNew && (!onycOnly || tx.isOnycRelated);
+    return tx.isNew && transactionMatchesAssetFilter(tx);
   }
 
-  function toggleOnycFilter() {
-    onycOnly = !onycOnly;
-    const button = document.getElementById('onycFilterBtn');
-    button.setAttribute('aria-pressed', String(onycOnly));
-    button.textContent = onycOnly ? '✓ ONyc only' : 'ONyc only';
-    document.getElementById('panelTitle').textContent = onycOnly ? 'ONyc Transactions' : 'Exponent CLMM Transactions';
+  function setAssetFilter(nextFilter) {
+    if (!['all', 'onyc', 'strcx', 'both'].includes(nextFilter)) return;
+    assetFilter = nextFilter;
+    ['all', 'onyc', 'strcx', 'both'].forEach(filter => {
+      document.getElementById(`${filter}FilterBtn`).setAttribute('aria-pressed', String(filter === assetFilter));
+    });
+    document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     renderCurrentTransactions();
     updateNotifUI();
   }
@@ -582,6 +607,7 @@
             interaction: 'Details unavailable',
             success: !top[i].err,
             isOnycRelated: false,
+            isStrcxRelated: false,
             isNew: !seenSigs.has(top[i].signature)
           });
           continue;
@@ -599,6 +625,7 @@
           interaction: getProgramInstructions(tx),
           success: !tx.meta?.err,
           isOnycRelated: transactionTouchesMint(tx, ONYC_MINT),
+          isStrcxRelated: transactionTouchesMint(tx, STRCX_MINT),
           isNew: !seenSigs.has(top[i].signature)
         });
         if (results.length >= DISPLAY_LIMIT) break;
@@ -642,8 +669,9 @@
   }
 
   function renderTable(txs) {
+    const filterCopy = getAssetFilterCopy();
     document.getElementById('sTx').innerText = txs.length;
-    document.getElementById('txBadge').innerText = txs.length + (onycOnly ? ' ONyc txs' : ' txs');
+    document.getElementById('txBadge').innerText = `${txs.length} ${filterCopy.badge}`;
     document.getElementById('sWal').innerText = new Set(txs.map(tx => tx.from).filter(Boolean)).size;
     const instructionTypes = new Set(
       txs.flatMap(tx => (tx.interaction || '').split(' · '))
@@ -659,10 +687,10 @@
     }
     if (!txs.length) {
       setStateMessage(
-        onycOnly ? 'No ONyc transactions' : 'No contract transactions',
-        onycOnly
-          ? `No transaction involving ONyc was found in the latest ${SIGNATURE_SCAN_LIMIT} contract signatures.`
-          : 'No contract transactions could be loaded.'
+        assetFilter === 'all' ? 'No contract transactions' : `No ${filterCopy.empty} transactions`,
+        assetFilter === 'all'
+          ? 'No contract transactions could be loaded.'
+          : `No transaction involving ${filterCopy.empty} was found in the latest ${SIGNATURE_SCAN_LIMIT} contract signatures.`
       );
       return;
     }
@@ -848,7 +876,7 @@
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
       banner.style.display = 'flex';
-      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${onycOnly ? 'ONyc only' : 'All transactions'} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
+      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${getAssetFilterCopy().scope} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
       notifyBtn.classList.remove('is-ready');

@@ -1,10 +1,14 @@
-# Exponent CLMM Transaction Tracker
+# Exponent Transaction Tracker
 
-A real-time dashboard for all transactions involving the Exponent CLMM contract on Solana.
+A real-time dashboard for Exponent CLMM and Exponent Orderbook transactions on Solana. Select a contract to scope the feed and alerts. Asset filters apply to either contract.
 
 ## Tracked contract
 
 `XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC`
+
+Orderbook: `XPBookgQTN2p8Yw1C2La35XkPMmZTCEYH77AdReVvK1`
+
+Switching contracts discards stale pending results and starts a fresh notification baseline, so historical transactions do not trigger alerts.
 
 The tracker does not filter by PT market, token mint, instruction, or transaction result. It displays the latest 20 contract signatures, including successful and failed transactions.
 

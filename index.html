@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Exponent CLMM | Contract Transaction Tracker</title>
+  <title>Exponent | Contract Transaction Tracker</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -158,7 +158,7 @@
   <header class="app-header">
     <div class="logo-area">
       <div class="brand-mark" aria-hidden="true">XPC</div>
-      <div class="brand"><h1>Exponent CLMM Tracker</h1><p>All contract transactions · Solana</p></div>
+      <div class="brand"><h1 id="trackerTitle">Exponent CLMM Tracker</h1><p>All contract transactions · Solana</p></div>
     </div>
     <div class="header-actions">
       <div class="live-badge" aria-label="Live monitoring status"><span class="dot-pulse"></span> Live</div>
@@ -168,7 +168,11 @@
   <section class="config-card" aria-labelledby="configTitle">
     <div>
       <div class="config-title" id="configTitle">RPC endpoint</div>
-      <div class="config-heading">Monitor every Exponent CLMM transaction</div>
+      <div class="config-heading">Choose a contract to monitor</div>
+      <div role="group" aria-label="Contract filter" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
+        <button id="clmmContractBtn" class="filter-button" type="button" aria-pressed="true" onclick="setContract('clmm')">Exponent CLMM</button>
+        <button id="orderbookContractBtn" class="filter-button" type="button" aria-pressed="false" onclick="setContract('orderbook')">Exponent Orderbook</button>
+      </div>
       <p class="config-copy">Load every recent contract signature, then optionally narrow both the activity feed and alerts to ONyc (OnRe), STRCx, or either asset together.</p>
     </div>
     <div class="proxy-row">
@@ -227,11 +231,16 @@
     </div>
     <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load transactions</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest Exponent CLMM activity.</p></div></div></div>
   </section>
-  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span>Exponent CLMM XPC1…varC · all contract activity</span></footer>
+  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span id="contractFooter">Exponent CLMM XPC1…varC · all contract activity</span></footer>
 </main>
 
 <script>
-  const PROGRAM = 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC';
+  const CONTRACTS = {
+    clmm: { name: 'Exponent CLMM', address: 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC' },
+    orderbook: { name: 'Exponent Orderbook', address: 'XPBookgQTN2p8Yw1C2La35XkPMmZTCEYH77AdReVvK1' }
+  };
+  let selectedContract = 'clmm';
+  let contractRevision = 0;
   const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
   const STRCX_MINT = 'Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH';
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
@@ -277,7 +286,7 @@
     return (tx.transaction?.message?.accountKeys || []).some(key => (key?.pubkey || key) === mint);
   }
 
-  function getProgramInstructions(tx) {
+  function getProgramInstructions(tx, program = CONTRACTS[selectedContract].address) {
     const logs = tx.meta?.logMessages || [];
     const stack = [];
     const instructions = [];
@@ -290,7 +299,7 @@
         continue;
       }
       const instruction = line.match(/^Program log: Instruction: (.+)$/);
-      if (instruction && stack.at(-1) === PROGRAM && !instructions.includes(instruction[1])) {
+      if (instruction && stack.at(-1) === program && !instructions.includes(instruction[1])) {
         instructions.push(instruction[1]);
         continue;
       }
@@ -500,7 +509,29 @@
     if (assetFilter === 'onyc') return { title: 'ONyc Transactions', scope: 'ONyc only', badge: 'ONyc txs', empty: 'ONyc' };
     if (assetFilter === 'strcx') return { title: 'STRCx Transactions', scope: 'STRCx only', badge: 'STRCx txs', empty: 'STRCx' };
     if (assetFilter === 'both') return { title: 'ONyc + STRCx Transactions', scope: 'ONyc or STRCx', badge: 'ONyc / STRCx txs', empty: 'ONyc or STRCx' };
-    return { title: 'Exponent CLMM Transactions', scope: 'All transactions', badge: 'txs', empty: '' };
+    return { title: `${CONTRACTS[selectedContract].name} Transactions`, scope: 'All transactions', badge: 'txs', empty: '' };
+  }
+
+  function setContract(key) {
+    if (!Object.hasOwn(CONTRACTS, key) || key === selectedContract) return;
+    selectedContract = key;
+    contractRevision++;
+    currentTxs = [];
+    seenSigs = new Set();
+    firstLoad = true;
+    for (const id of Object.keys(CONTRACTS)) {
+      document.getElementById(`${id}ContractBtn`).setAttribute('aria-pressed', String(id === key));
+    }
+    const contract = CONTRACTS[key];
+    document.getElementById('trackerTitle').textContent = `${contract.name} Tracker`;
+    document.getElementById('contractFooter').textContent = `${contract.name} ${sh(contract.address)} · all contract activity`;
+    document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
+    document.getElementById('lastUpdate').textContent = 'Not yet fetched';
+    document.getElementById('refreshTime').textContent = 'Last updated --:--:--';
+    renderCurrentTransactions();
+    updateNotifUI();
+    setLoading(`Loading ${contract.name} transactions…`);
+    if (!fetchInFlight) fetchAll();
   }
 
   function renderCurrentTransactions() {
@@ -576,6 +607,8 @@
     const proxy = getProxy();
     if (!proxy) { alert('Enter your Cloudflare Worker URL.'); return; }
     fetchInFlight = true;
+    const revision = contractRevision;
+    const contract = CONTRACTS[selectedContract];
     const btn = document.getElementById('rfBtn');
     if (!silent) {
       btn.disabled = true;
@@ -584,15 +617,17 @@
       setLoading('Fetching recent contract signatures…');
     }
     try {
-      const sigs = await rpcCall(proxy, 'getSignaturesForAddress', [PROGRAM, {limit:SIGNATURE_SCAN_LIMIT, commitment:'confirmed'}]);
+      const sigs = await rpcCall(proxy, 'getSignaturesForAddress', [contract.address, {limit:SIGNATURE_SCAN_LIMIT, commitment:'confirmed'}]);
+      if (revision !== contractRevision) return;
       const top = (sigs || []).slice(0, SIGNATURE_SCAN_LIMIT);
       if (!top.length) { setEmpty('No transactions found for this contract.'); return; }
-      if (!silent) setLoading(`Loading ${top.length} recent Exponent CLMM transactions…`);
+      if (!silent) setLoading(`Loading ${top.length} recent ${contract.name} transactions…`);
       const txs = await mapWithConcurrency(
         top,
         FETCH_CONCURRENCY,
-        item => getTransactionCached(proxy, item.signature)
+        item => revision === contractRevision ? getTransactionCached(proxy, item.signature) : null
       );
+      if (revision !== contractRevision) return;
 
       const results = [];
       for (let i=0; i<txs.length; i++) {
@@ -622,7 +657,7 @@
           from,
           amount: changes[0] ? Math.abs(changes[0].delta) : 0,
           changes,
-          interaction: getProgramInstructions(tx),
+          interaction: getProgramInstructions(tx, contract.address),
           success: !tx.meta?.err,
           isOnycRelated: transactionTouchesMint(tx, ONYC_MINT),
           isStrcxRelated: transactionTouchesMint(tx, STRCX_MINT),
@@ -638,12 +673,12 @@
           const isHigh = tx.amount > getHighVolumeThreshold();
           if (isHigh && trackerNotify.high) {
             playHighVolumeAlert();
-            showBrowserNotification(`High volume Exponent CLMM transaction`, {
+            showBrowserNotification(`High volume ${contract.name} transaction`, {
               body: `${tx.interaction} · ${formatPrimaryChange(tx)} · ${sh(tx.from)}`
             });
           } else if (trackerNotify.normal) {
             playAlert();
-            showBrowserNotification(`Exponent CLMM transaction ${tx.success ? 'confirmed' : 'failed'}`, {
+            showBrowserNotification(`${contract.name} transaction ${tx.success ? 'confirmed' : 'failed'}`, {
               body: `${tx.interaction} · ${formatPrimaryChange(tx)} · ${sh(tx.from)}`
             });
           }
@@ -656,6 +691,7 @@
       document.getElementById('lastUpdate').innerText = 'Updated: ' + new Date().toLocaleTimeString();
       document.getElementById('refreshTime').textContent = 'Last updated ' + new Date().toLocaleTimeString();
     } catch(e) {
+      if (revision !== contractRevision) return;
       if (!silent || !currentTxs.length) setStateMessage('Connection issue', e.message, 'error');
       console.error(e);
     } finally {
@@ -665,6 +701,7 @@
         document.getElementById('rfIcon').classList.remove('spinning');
       }
       fetchInFlight = false;
+      if (revision !== contractRevision) fetchAll();
     }
   }
 
@@ -876,7 +913,7 @@
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
       banner.style.display = 'flex';
-      banner.innerText = `Exponent CLMM alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${getAssetFilterCopy().scope} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
+      banner.innerText = `${CONTRACTS[selectedContract].name} alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${getAssetFilterCopy().scope} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
       notifyBtn.classList.remove('is-ready');

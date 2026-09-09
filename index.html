@@ -187,7 +187,7 @@
       <button type="button" class="primary-action" onclick="fetchAll()">Load data</button>
     </div>
     <div class="notice-row">
-      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 5s. <span id="volumeNote">High volume compares the largest signer token change in each transaction.</span></div>
+      <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 2s. <span id="volumeNote">High volume compares the largest signer token change in each transaction.</span></div>
       <div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
     <div class="notification-actions" aria-label="Notification controls">
@@ -206,7 +206,7 @@
   <section class="refresh-strip" aria-label="Auto refresh">
     <div class="refresh-label">
       <div class="refresh-label-top">Auto-refresh</div>
-      <div class="refresh-label-bottom">Every 5 seconds</div>
+      <div class="refresh-label-bottom">Every 2 seconds</div>
     </div>
     <div class="refresh-track"><div id="refreshFill" class="refresh-fill"></div></div>
     <div id="refreshTime" class="refresh-time">Last updated --:--:--</div>
@@ -492,7 +492,7 @@
   const SIGNATURE_SCAN_LIMIT = 20;
   const DISPLAY_LIMIT = 20;
   const FETCH_CONCURRENCY = 4;
-  const POLL_INTERVAL_MS = 5000;
+  const POLL_INTERVAL_MS = 2000;
 
   function getCurrentNotifyState() {
     return notifyState;

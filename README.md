@@ -21,7 +21,7 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 - Filters both the feed and notifications by all activity, ONyc (OnRe), STRCx, or either tracked asset together
 - Tracks ONyc mint `5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5` and STRCx mint `Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH`
 - Lets each user set and locally save a high-volume threshold
-- Refreshes every 20 seconds
+- Refreshes every 5 seconds
 - Caches immutable transaction data to reduce RPC traffic
 - Supports regular and high-volume browser alerts
 - Links every result to Solscan

@@ -173,7 +173,7 @@
         <button id="clmmContractBtn" class="filter-button" type="button" aria-pressed="true" onclick="setContract('clmm')">Exponent CLMM</button>
         <button id="orderbookContractBtn" class="filter-button" type="button" aria-pressed="false" onclick="setContract('orderbook')">Exponent Orderbook</button>
       </div>
-      <p class="config-copy">Load every recent contract signature, then filter the activity feed and alerts by ONyc, STRCx, srONyc, eUSX, or USX.</p>
+      <p class="config-copy">Select one or more tokens to filter the feed and alerts. Transactions matching any selected token are included. Click a token again to deselect it, or All to reset.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -496,7 +496,7 @@
   let audioContext = null;
   const notifyState = { armed: false, normal: false, high: false };
   let currentTxs = [];
-  let assetFilter = 'all';
+  const selectedAssets = new Set();
   let fetchInFlight = false;
   const txCache = new Map();
   const SIGNATURE_SCAN_LIMIT = 20;
@@ -509,12 +509,15 @@
   }
 
   function transactionMatchesAssetFilter(tx) {
-    return assetFilter === 'all' || tx.relatedAssets?.includes(assetFilter) === true;
+    return selectedAssets.size === 0 || tx.relatedAssets?.some(key => selectedAssets.has(key)) === true;
   }
 
   function getAssetFilterCopy() {
-    const asset = ASSETS[assetFilter];
-    if (asset) return { title: `${asset.label} Transactions`, scope: `${asset.label} only`, badge: `${asset.label} txs`, empty: asset.label };
+    const labels = Object.keys(ASSETS).filter(key => selectedAssets.has(key)).map(key => ASSETS[key].label);
+    if (labels.length) {
+      const label = labels.join(' + ');
+      return { title: `${label} Transactions`, scope: labels.join(' or '), badge: 'matching txs', empty: labels.join(' or ') };
+    }
     return { title: `${CONTRACTS[selectedContract].name} Transactions`, scope: 'All transactions', badge: 'txs', empty: '' };
   }
 
@@ -551,9 +554,11 @@
 
   function setAssetFilter(nextFilter) {
     if (nextFilter !== 'all' && !Object.hasOwn(ASSETS, nextFilter)) return;
-    assetFilter = nextFilter;
+    if (nextFilter === 'all') selectedAssets.clear();
+    else if (selectedAssets.has(nextFilter)) selectedAssets.delete(nextFilter);
+    else selectedAssets.add(nextFilter);
     ['all', ...Object.keys(ASSETS)].forEach(filter => {
-      document.getElementById(`${filter}FilterBtn`).setAttribute('aria-pressed', String(filter === assetFilter));
+      document.getElementById(`${filter}FilterBtn`).setAttribute('aria-pressed', String(filter === 'all' ? selectedAssets.size === 0 : selectedAssets.has(filter)));
     });
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     renderCurrentTransactions();
@@ -728,8 +733,8 @@
     }
     if (!txs.length) {
       setStateMessage(
-        assetFilter === 'all' ? 'No contract transactions' : `No ${filterCopy.empty} transactions`,
-        assetFilter === 'all'
+        selectedAssets.size === 0 ? 'No contract transactions' : `No ${filterCopy.empty} transactions`,
+        selectedAssets.size === 0
           ? 'No contract transactions could be loaded.'
           : `No transaction involving ${filterCopy.empty} was found in the latest ${SIGNATURE_SCAN_LIMIT} contract signatures.`
       );

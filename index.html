@@ -88,7 +88,7 @@
     .panel-kicker { color: var(--dim); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
     .panel-title { font-weight: 650; font-size: 1.08rem; letter-spacing: 0; color: var(--text); }
     .panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-    .asset-filter-group { display: flex; align-items: center; gap: 6px; }
+    .asset-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
     .filter-button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #03100b; box-shadow: 0 0 0 2px rgba(0, 214, 143, 0.12); }
     .filter-button[aria-pressed="true"]:hover { background: #32e2aa; color: #03100b; }
     .tx-badge { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.24); border-radius: var(--radius); padding: 7px 10px; font-size: 0.76rem; font-weight: 750; color: var(--accent); white-space: nowrap; }
@@ -173,7 +173,7 @@
         <button id="clmmContractBtn" class="filter-button" type="button" aria-pressed="true" onclick="setContract('clmm')">Exponent CLMM</button>
         <button id="orderbookContractBtn" class="filter-button" type="button" aria-pressed="false" onclick="setContract('orderbook')">Exponent Orderbook</button>
       </div>
-      <p class="config-copy">Load every recent contract signature, then optionally narrow both the activity feed and alerts to ONyc (OnRe), STRCx, or either asset together.</p>
+      <p class="config-copy">Load every recent contract signature, then filter the activity feed and alerts by ONyc, STRCx, srONyc, eUSX, or USX.</p>
     </div>
     <div class="proxy-row">
       <div class="field">
@@ -223,7 +223,9 @@
           <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
           <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by ONyc (OnRe) mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="setAssetFilter('onyc')">ONyc</button>
           <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by STRCx mint Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH" onclick="setAssetFilter('strcx')">STRCx</button>
-          <button id="bothFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Show transactions involving either ONyc or STRCx" onclick="setAssetFilter('both')">Both</button>
+          <button id="sronycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('sronyc')">srONyc</button>
+          <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
+          <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
         </div>
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
@@ -243,12 +245,20 @@
   let contractRevision = 0;
   const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
   const STRCX_MINT = 'Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH';
+  const ASSETS = {
+    onyc: { label: 'ONyc', mint: ONYC_MINT },
+    strcx: { label: 'STRCx', mint: STRCX_MINT },
+    sronyc: { label: 'srONyc', mint: '9J8VvigcjFTkN3jhZH2ieTi2hdGVBVpEXbcA1JDo7QpA' },
+    eusx: { label: 'eUSX', mint: '3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC' },
+    usx: { label: 'USX', mint: '6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG' }
+  };
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
   const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';
   const RPC_TIMEOUT_MS = 8000;
   const KNOWN_TOKEN_LABELS = {
     [ONYC_MINT]: 'ONyc',
     [STRCX_MINT]: 'STRCx',
+    ...Object.fromEntries(Object.values(ASSETS).map(asset => [asset.mint, asset.label])),
     BULKoNSGzxtCqzwTvg5hFJg8fx6dqZRScyXe5LYMfxrn: 'bulkSOL',
     HgyWqTZ6JdGYF5TfrYmScTyvsyuopwYRJXwqA2LzCrz6: 'PT-bulkSOL',
     Fy7SiHCwMzNMXYgygQhpYvjSg23G8B9TfZm3mHNgy6Bu: 'wBulkSOL'
@@ -499,16 +509,12 @@
   }
 
   function transactionMatchesAssetFilter(tx) {
-    if (assetFilter === 'onyc') return tx.isOnycRelated;
-    if (assetFilter === 'strcx') return tx.isStrcxRelated;
-    if (assetFilter === 'both') return tx.isOnycRelated || tx.isStrcxRelated;
-    return true;
+    return assetFilter === 'all' || tx.relatedAssets?.includes(assetFilter) === true;
   }
 
   function getAssetFilterCopy() {
-    if (assetFilter === 'onyc') return { title: 'ONyc Transactions', scope: 'ONyc only', badge: 'ONyc txs', empty: 'ONyc' };
-    if (assetFilter === 'strcx') return { title: 'STRCx Transactions', scope: 'STRCx only', badge: 'STRCx txs', empty: 'STRCx' };
-    if (assetFilter === 'both') return { title: 'ONyc + STRCx Transactions', scope: 'ONyc or STRCx', badge: 'ONyc / STRCx txs', empty: 'ONyc or STRCx' };
+    const asset = ASSETS[assetFilter];
+    if (asset) return { title: `${asset.label} Transactions`, scope: `${asset.label} only`, badge: `${asset.label} txs`, empty: asset.label };
     return { title: `${CONTRACTS[selectedContract].name} Transactions`, scope: 'All transactions', badge: 'txs', empty: '' };
   }
 
@@ -544,9 +550,9 @@
   }
 
   function setAssetFilter(nextFilter) {
-    if (!['all', 'onyc', 'strcx', 'both'].includes(nextFilter)) return;
+    if (nextFilter !== 'all' && !Object.hasOwn(ASSETS, nextFilter)) return;
     assetFilter = nextFilter;
-    ['all', 'onyc', 'strcx', 'both'].forEach(filter => {
+    ['all', ...Object.keys(ASSETS)].forEach(filter => {
       document.getElementById(`${filter}FilterBtn`).setAttribute('aria-pressed', String(filter === assetFilter));
     });
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
@@ -641,8 +647,7 @@
             changes: [],
             interaction: 'Details unavailable',
             success: !top[i].err,
-            isOnycRelated: false,
-            isStrcxRelated: false,
+            relatedAssets: [],
             isNew: !seenSigs.has(top[i].signature)
           });
           continue;
@@ -659,8 +664,7 @@
           changes,
           interaction: getProgramInstructions(tx, contract.address),
           success: !tx.meta?.err,
-          isOnycRelated: transactionTouchesMint(tx, ONYC_MINT),
-          isStrcxRelated: transactionTouchesMint(tx, STRCX_MINT),
+          relatedAssets: Object.keys(ASSETS).filter(key => transactionTouchesMint(tx, ASSETS[key].mint)),
           isNew: !seenSigs.has(top[i].signature)
         });
         if (results.length >= DISPLAY_LIMIT) break;

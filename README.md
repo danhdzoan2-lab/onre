@@ -18,7 +18,8 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 - Decodes the primary Exponent instruction from program logs
 - Displays signer-owned SPL token balance changes for any mint
 - Shows successful and failed transaction status
-- Filters both the feed and notifications by all activity, ONyc (OnRe), STRCx, or either tracked asset together
+- Filters the feed and notifications by All, ONyc, STRCx, srONyc, eUSX, or USX
+- Tracks srONyc `9J8VvigcjFTkN3jhZH2ieTi2hdGVBVpEXbcA1JDo7QpA`, eUSX `3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC`, and USX `6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG`
 - Tracks ONyc mint `5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5` and STRCx mint `Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH`
 - Lets each user set and locally save a high-volume threshold
 - Refreshes every 2 seconds

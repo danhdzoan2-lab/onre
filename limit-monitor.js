@@ -123,6 +123,7 @@ function renderLimitCells(row, assetKey, market) {
   const gap = market && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100) && apy !== null
     ? market.impliedApy * 100 - apy : null;
   row.limitGap.textContent = gap === null ? '—' : `${gap >= 0 ? '+' : ''}${gap.toFixed(2)}${apyState.error ? ' (dữ liệu cũ)' : ''}`;
+  if (typeof renderRewardRange === 'function') renderRewardRange(row, market, record.apy);
 }
 function evaluateLimitAlerts() {
   if (!limitState.wallet || apyState.error || !apyState.checkedAt || Date.now() - apyState.checkedAt > 8000) return;

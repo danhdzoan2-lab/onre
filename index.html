@@ -240,7 +240,9 @@
       <button type="button" disabled title="Chỉ bật sau khi đối chiếu bộ giải mã với lệnh thật">Dùng lệnh này làm mốc</button>
       <p>Nhập APY theo %, ngưỡng không âm theo điểm phần trăm. Báo khi Market APY − My APY ≤ ngưỡng (có dấu, không lấy trị tuyệt đối; chênh lệch âm cũng báo). Sau khi nhập hoặc bật cảnh báo, nếu đã thỏa điều kiện thì báo một lần ở lần kiểm tra APY thành công kế tiếp. Chỉ báo lại khi chênh lệch đã lên trên ngưỡng rồi giảm về bằng hoặc dưới ngưỡng. Để trống để tắt theo dõi market. Lưu riêng theo ví, market và kỳ hạn trên trình duyệt này. Âm báo cần trang đang hoạt động; không bảo đảm khi đóng hoặc đình chỉ tab. Đây không phải bảo đảm lệnh sẽ không khớp.</p>
     </div>
-    <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Ngày đáo hạn</th><th>Thời gian còn lại</th><th>Implied APY</th><th>My Limit Order APY (%)</th><th>Chênh lệch (đpt)</th><th>Ngưỡng (đpt)</th></tr></thead><tbody id="apyRows"></tbody></table></div>
+    <p class="apy-note">Range chỉ so với APY nhập tay, không xác nhận lệnh thật nhận thưởng hoặc tránh khớp lệnh. <a href="https://app.exponent.finance/api/orderbook-emissions/campaigns" target="_blank" rel="noopener noreferrer">Nguồn range Exponent</a></p>
+    <p class="apy-note" id="rewardRangeStatus" role="status">Đang tải range…</p>
+    <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Ngày đáo hạn</th><th>Thời gian còn lại</th><th>Implied APY</th><th>My Limit Order APY (%)</th><th>Implied APY range</th><th>Chênh lệch (đpt)</th><th>Ngưỡng (đpt)</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
@@ -992,6 +994,7 @@
 </script>
 <script src="apy.js"></script>
 <script src="limit-monitor.js"></script>
+<script src="reward-range.js"></script>
 <style>
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }

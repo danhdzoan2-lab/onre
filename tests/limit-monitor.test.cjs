@@ -15,6 +15,8 @@ const ctx = vm.createContext({ Date, Map, BigInt, Number, JSON,
 });
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../limit-monitor.js'), 'utf8'), ctx);
 const run = s => vm.runInContext(s, ctx);
+// Keep these threshold/audio-note regression tests independent of the latched alarm lifecycle.
+run(`startLimitAlarmAudio = playLimitApyAlert; limitAlarm.entries.has=()=>false; limitAlarm.entries.set=()=>{};`);
 const wallet = '3srhDoV9VunGoVGEVNy8NMhkoqeQE8szhN1T2Z6qPgof';
 assert.equal(run(`validLimitWallet('${wallet}')`), true);
 assert.equal(run(`validLimitWallet('bad')`), false);
@@ -90,6 +92,7 @@ run(`apyState.error=''; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(tones.length,9); // Enabling while already <= threshold alerts once, only with fresh data.
 console.log('PASS: already at/below threshold on enable, no repeat, no stale initial alert');
 elements.set('limitAudioStatus',el());
+run(`startLimitAlarmAudio=()=>{};`); // Unlock tests below exercise only the one-shot test chime.
 (async()=>{
   ctx.fakeAudio.resume=async()=>{ctx.fakeAudio.state='running';};
   ctx.fakeAudio.state='suspended';

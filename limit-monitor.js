@@ -2,18 +2,67 @@
 const limitState = { wallet: '', records: {}, edges: new Map(), enabled: false, storageError: false };
 const LIMIT_STORAGE = 'exponent-limit-monitor-v1';
 let limitAudio = null;
+const limitAlarm = { entries: new Map(), source: null, generation: 0 };
+function renderLimitAlarm() {
+  const panel = document.getElementById('limitAlarmPanel');
+  if (!panel) return;
+  panel.hidden = limitAlarm.entries.size === 0;
+  document.getElementById('limitAlarmItems').textContent = [...limitAlarm.entries.values()].join('\n');
+  document.getElementById('limitAlarmData').textContent = apyState.error || Date.now() - apyState.checkedAt > 10000
+    ? 'Dữ liệu APY cũ / mất kết nối. Báo thức vẫn tiếp tục đến khi bấm Dừng.'
+    : 'Đã ghi nhận điều kiện cảnh báo. Âm tiếp tục kể cả khi APY hồi phục, đến khi bấm Dừng.';
+}
+function startLimitAlarmAudio() {
+  if (!limitAlarm.entries.size || limitAlarm.source) return;
+  if (!limitAudio || limitAudio.state !== 'running') {
+    limitAudioStatus('Báo thức đang chờ âm thanh. Bấm Thử âm APY để mở khóa.'); return;
+  }
+  try {
+    // A two-second PCM loop runs on the audio clock, independent of polling timers.
+    const rate = limitAudio.sampleRate;
+    const buffer = limitAudio.createBuffer(1, rate * 2, rate), samples = buffer.getChannelData(0);
+    [1046.5, 1318.5, 1568].forEach((frequency, index) => {
+      for (let n = 0; n < Math.floor(rate * 0.19); n++) {
+        const t = n / rate;
+        const envelope = t < 0.015 ? t / 0.015 : Math.exp(-35 * (t - 0.015));
+        samples[Math.floor(index * 0.22 * rate) + n] = 0.25 * envelope * Math.sin(2 * Math.PI * frequency * t);
+      }
+    });
+    const source = limitAudio.createBufferSource();
+    source.buffer = buffer; source.loop = true; source.connect(limitAudio.destination);
+    source.start(); limitAlarm.source = source;
+    limitAudioStatus('');
+  } catch { limitAudioStatus('Không phát được báo thức. Bấm Thử âm APY và kiểm tra quyền âm thanh.'); }
+}
+function stopLimitAlarm() {
+  limitAlarm.generation++;
+  if (limitAlarm.source) {
+    try { limitAlarm.source.stop(); limitAlarm.source.disconnect(); } catch { /* Already stopped. */ }
+    limitAlarm.source = null;
+  }
+  limitAlarm.entries.clear();
+  // Preserve edge states: acknowledging does not re-arm a still-triggered market.
+  renderLimitAlarm();
+}
 function limitAudioStatus(message) {
   const status = document.getElementById('limitAudioStatus');
   if (status) status.textContent = message;
 }
 function unlockLimitAudio() {
   try {
-    if (!limitAudio) limitAudio = new (window.AudioContext || window.webkitAudioContext)();
+    if (!limitAudio) {
+      limitAudio = new (window.AudioContext || window.webkitAudioContext)();
+      limitAudio.onstatechange = () => {
+        if (limitAudio.state !== 'running' && limitAlarm.entries.size) limitAudioStatus('Báo thức bị trình duyệt đình chỉ. Bấm Thử âm APY để tiếp tục.');
+      };
+    }
+    const generation = limitAlarm.generation;
     const resumed = limitAudio.resume();
     limitAudioStatus(limitAudio.state === 'running' ? '' : 'Nếu chưa nghe được âm, bấm Thử âm APY và cho phép âm thanh cho trang.');
     return Promise.resolve(resumed).then(() => {
       const ready = limitAudio.state === 'running';
       limitAudioStatus(ready ? '' : 'Trình duyệt chặn âm thanh. Bấm Thử âm APY hoặc cho phép âm thanh cho trang.');
+      if (ready && generation === limitAlarm.generation) startLimitAlarmAudio();
       return ready;
     }).catch(() => { limitAudioStatus('Không mở được âm thanh. Bấm Thử âm APY và kiểm tra quyền âm thanh.'); return false; });
   } catch {
@@ -73,6 +122,7 @@ function saveLimits() {
     : limitState.wallet ? `Ví đang theo dõi APY: ${limitState.wallet}` : 'Nhập ví và bấm Load orders để cấu hình APY.';
 }
 function setLimitWallet(wallet) {
+  stopLimitAlarm();
   limitState.wallet = wallet;
   limitState.edges.clear();
   document.getElementById('limitAlertStatus').textContent = '';
@@ -141,11 +191,16 @@ function evaluateLimitAlerts() {
     const previous = limitState.edges.get(key);
     limitState.edges.set(key, triggered);
     if (previous === true || !triggered || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
-    messages.push(`${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`);
+    const message = `${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`;
+    if (!limitAlarm.entries.has(key)) {
+      limitAlarm.entries.set(key, `${message} Ghi nhận: ${apyDate(Date.now())} · Ví ${limitState.wallet}`);
+      messages.push(message);
+    }
   }
   if (messages.length) {
     const body = `${messages.join('\n')}\nVí ${limitState.wallet}`;
-    playLimitApyAlert();
+    startLimitAlarmAudio();
+    renderLimitAlarm();
     document.getElementById('limitAlertStatus').textContent = `Chênh lệch APY ≤ ngưỡng · ${body}`;
     // Synchronous notification creation: no delayed callback can alert for a previous wallet.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -173,11 +228,15 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
   });
   document.getElementById('limitAlerts').addEventListener('change', event => {
     limitState.enabled = event.target.checked; limitState.edges.clear();
+    if (!limitState.enabled) stopLimitAlarm();
     if (limitState.enabled) unlockLimitAudio();
     if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
   });
   document.getElementById('testLimitAudio').addEventListener('click', () => {
-    unlockLimitAudio().then(ready => { if (ready) playLimitApyAlert(); });
+    const generation = limitAlarm.generation;
+    unlockLimitAudio().then(ready => { if (ready && generation === limitAlarm.generation && !limitAlarm.entries.size) playLimitApyAlert(); });
   });
+  document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
+  setInterval(renderLimitAlarm, 2000);
   saveLimits(); renderApy();
 });

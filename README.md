@@ -69,6 +69,10 @@ APY alerts trigger when `Market APY - My APY <= threshold`, including equality, 
 
 Tests: `node tests/apy.test.cjs` and `node tests/limit-monitor.test.cjs`.
 
+## Latched APY alarm
+
+APY alerts now latch a shared two-second Web Audio buffer loop until **Dừng báo thức** is pressed. The panel retains all triggered markets and their trigger-time details even if APY recovers, filters change or the API fails. Stop immediately halts/disconnects the audio source and acknowledges every current entry without clearing threshold edge state. A new above-to-at/below crossing or explicit settings reset can re-arm. Switching wallet or disabling alerts stops and clears the alarm. Notification messages are sent only for newly latched entries, never for sound repetitions. The test button plays a short chime when idle, or unlocks the existing alarm without layering another sound. Audio runs independently of polling but cannot be guaranteed during browser suspension, sleep or tab closure. Alarm state is not persisted. Run `node tests/limit-alarm.test.cjs` for the lifecycle tests.
+
 ## Reward APY range
 
 `reward-range.js` reads the public Exponent campaigns API independently every 2 seconds (8-second timeout, no overlap, Retry-After on 429). It matches the selected farthest-maturity vault and its orderbook addresses, requires buyYT quote incentives, current campaign dates and remaining funding using BigInt. Multiple campaigns remain separate. The range follows Exponent's exponential conversion of campaign marketImpliedApy and priceBandBps, not the dashboard market APY. Manual APY is compared against unrounded inclusive bounds; expandable details expose precision. Missing metadata is unknown, not a made-up range. Failed fetches retain previous ranges marked stale without claiming current membership. No range notifications or order eligibility guarantees are added. Run `node tests/reward-range.test.cjs` for fixtures and polling failure checks.

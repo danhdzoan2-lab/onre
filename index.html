@@ -236,6 +236,13 @@
       <p id="limitAudioStatus" role="status"></p>
       <p id="limitWalletStatus" role="status"></p>
       <p id="limitAlertStatus" role="status"></p>
+      <section id="limitAlarmPanel" hidden role="alert" style="position:sticky;top:8px;z-index:20;background:#382018;border:2px solid #ffad66;border-radius:12px;padding:16px;margin:12px 0">
+        <strong>Báo thức APY đang bật</strong>
+        <button id="stopLimitAlarm" type="button" style="background:#ffad66;color:#201007;min-height:48px;margin:8px">Dừng báo thức</button>
+        <p id="limitAlarmItems" style="white-space:pre-line;overflow-wrap:anywhere"></p>
+        <p id="limitAlarmData"></p>
+      </section>
+      <p>Âm APY lặp mỗi 2 giây đến khi bấm Dừng báo thức. Đổi ví hoặc tắt cảnh báo cũng ngắt âm. Dừng xác nhận tất cả market đang báo; cùng market chỉ báo lại sau lần chạm ngưỡng mới hoặc khi sửa thiết lập/bật lại cảnh báo.</p>
       <p id="queueStatus">Chưa xác minh được vị trí · Chức năng hàng chờ chưa khả dụng: chưa xác minh bộ giải mã order ID, chủ lệnh, phía mua YT, giá gốc và sự kiện khớp/hủy.</p>
       <button type="button" disabled title="Chỉ bật sau khi đối chiếu bộ giải mã với lệnh thật">Dùng lệnh này làm mốc</button>
       <p>Nhập APY theo %, ngưỡng không âm theo điểm phần trăm. Báo khi Market APY − My APY ≤ ngưỡng (có dấu, không lấy trị tuyệt đối; chênh lệch âm cũng báo). Sau khi nhập hoặc bật cảnh báo, nếu đã thỏa điều kiện thì báo một lần ở lần kiểm tra APY thành công kế tiếp. Chỉ báo lại khi chênh lệch đã lên trên ngưỡng rồi giảm về bằng hoặc dưới ngưỡng. Để trống để tắt theo dõi market. Lưu riêng theo ví, market và kỳ hạn trên trình duyệt này. Âm báo cần trang đang hoạt động; không bảo đảm khi đóng hoặc đình chỉ tab. Đây không phải bảo đảm lệnh sẽ không khớp.</p>

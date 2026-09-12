@@ -37,6 +37,7 @@ function renderRewardRange(row, market, manual) {
   if (!row.rewardCell) {
     row.rewardCell = document.createElement('td');
     row.rewardCell.dataset.label = 'Implied APY range';
+    row.rewardCell.className = 'amount';
     row.insertBefore(row.rewardCell, row.limitGap);
   }
   const state = rewardRangeState;
@@ -52,18 +53,15 @@ function renderRewardRange(row, market, manual) {
   row.rewardCell.dataset.model = model;
   row.rewardCell.replaceChildren();
   const wrap = document.createElement('div');
-  if (!entries || (!entries.length && stale)) wrap.textContent = 'Chưa xác định';
-  else if (!entries.length) wrap.textContent = 'Chưa có chương trình thưởng còn hiệu lực';
+  if (!entries || (!entries.length && stale)) wrap.textContent = '—';
+  else if (!entries.length) wrap.textContent = '—';
   else for (const entry of entries) {
     const item = document.createElement('div');
-    if (!entry.band) item.textContent = 'Chưa xác định';
+    if (!entry.band) item.textContent = '—';
     else {
       const {low, high} = entry.band;
-      item.textContent = `${low.toFixed(2)}%–${high.toFixed(2)}% · ${stale ? 'Dữ liệu cũ · Chưa xác định' : rewardPosition(entry.band, manual)}`;
-      const details = document.createElement('details'), summary = document.createElement('summary'), precision = document.createElement('div');
-      summary.textContent = 'Chi tiết range';
-      precision.textContent = `${low}% – ${high}% · Campaign: ${entry.id}`;
-      details.append(summary, precision); item.appendChild(details);
+      item.textContent = `${low.toFixed(2)}%–${high.toFixed(2)}%${stale ? ' *' : ''}`;
+      item.title = stale ? 'Dữ liệu cũ' : '';
     }
     wrap.appendChild(item);
   }

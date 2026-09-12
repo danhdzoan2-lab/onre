@@ -17,14 +17,11 @@ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../limit-m
 const run = s => vm.runInContext(s, ctx);
 // Keep these threshold/audio-note regression tests independent of the latched alarm lifecycle.
 run(`startLimitAlarmAudio = playLimitApyAlert; limitAlarm.entries.has=()=>false; limitAlarm.entries.set=()=>{};`);
-const wallet = '3srhDoV9VunGoVGEVNy8NMhkoqeQE8szhN1T2Z6qPgof';
-assert.equal(run(`validLimitWallet('${wallet}')`), true);
-assert.equal(run(`validLimitWallet('bad')`), false);
 for (const v of ['', ' ', '-1', 'NaN', 'Infinity', '1e4', '10x']) assert.equal(run(`limitNumber(${JSON.stringify(v)})`), null);
 assert.equal(run(`limitNumber('0')`), 0);
-run(`setLimitWallet('${wallet}'); limitState.enabled=true;
+run(`limitState.enabled=true;
 apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.102}];
-const market=apyState.markets[0]; const key=limitKey(limitState.wallet,market);
+const market=apyState.markets[0]; const key=limitKey(market);
 limitState.records[key]={apy:'10',threshold:'0.1'}; evaluateLimitAlerts();`);
 assert.equal(notices, 0);
 run(`market.impliedApy=.1011; evaluateLimitAlerts();`);
@@ -35,13 +32,13 @@ run(`market.impliedApy=.102; evaluateLimitAlerts(); apyState.error='offline'; ma
 assert.equal(notices, 1);
 run(`apyState.error=''; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
-run(`setLimitWallet(''); evaluateLimitAlerts();`);
+run(`limitState.enabled=false; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
-run(`setLimitWallet('${wallet}'); evaluateLimitAlerts();`);
+run(`limitState.enabled=true; limitState.edges.clear(); evaluateLimitAlerts();`);
 assert.equal(notices, 3); // Restored wallet alerts once when the signed gap is already <= threshold.
 run(`evaluateLimitAlerts()`);
 assert.equal(notices, 3);
-assert.notEqual(run(`limitKey('${wallet}',market)`), run(`limitKey('${wallet}',{...market,maturityDateUnixTs:1})`));
+assert.notEqual(run(`limitKey(market)`), run(`limitKey({...market,maturityDateUnixTs:1})`));
 ctx.row = el();
 run(`renderLimitCells(row,'onyc',market); row.limitInputs[0].value='10.03'; row.limitInputs[0].input(); renderLimitCells(row,'onyc',market);`);
 assert.equal(ctx.row.limitInputs[0].value, '10.03');
@@ -67,7 +64,7 @@ market.underlyingAsset={mint:'mint'}; market.impliedApy=.102;
 apyState.markets.push(second);
 farthestApyMarket=(ms,mint)=>ms.find(m=>m.underlyingAsset.mint===mint);
 limitState.records[key]={apy:'10',threshold:'0.1'};
-limitState.records[limitKey(limitState.wallet,second)]={apy:'10',threshold:'0.1'};`);
+limitState.records[limitKey(second)]={apy:'10',threshold:'0.1'};`);
 let tones = [];
 ctx.fakeAudio = {state:'running',currentTime:0,destination:{},
   createOscillator(){const osc={frequency:{value:0},connect(){},disconnect(){},start(){tones.push(osc.frequency.value);},stop(){}};return osc;},

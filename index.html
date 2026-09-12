@@ -225,30 +225,22 @@
 
   <section class="table-panel" aria-labelledby="apyTitle">
     <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
-    <p class="apy-note">Kiểm tra mỗi 2 giây · Nguồn có cache 30 giây, không đảm bảo có APY mới mỗi lần kiểm tra. Áp dụng các bộ lọc token bên dưới.</p>
+    <p class="apy-note">Kiểm tra 2 giây · Cache APY 30 giây</p>
     <p class="apy-note" id="apyStatus" role="status">Đang tải APY…</p>
     <div class="apy-note">
-      <label for="limitWallet">Wallet address</label>
-      <input id="limitWallet" type="text" autocomplete="off" spellcheck="false" placeholder="Địa chỉ ví Solana" style="width:min(100%,440px)">
-      <button id="loadLimitOrders" type="button">Load orders</button>
       <label><input id="limitAlerts" type="checkbox"> Cảnh báo khoảng cách APY</label>
       <button id="testLimitAudio" type="button">Thử âm APY</button>
       <p id="limitAudioStatus" role="status"></p>
-      <p id="limitWalletStatus" role="status"></p>
-      <p id="limitAlertStatus" role="status"></p>
+      <p id="limitStorageStatus" role="status"></p>
       <section id="limitAlarmPanel" hidden role="alert" style="position:sticky;top:8px;z-index:20;background:#382018;border:2px solid #ffad66;border-radius:12px;padding:16px;margin:12px 0">
         <strong>Báo thức APY đang bật</strong>
         <button id="stopLimitAlarm" type="button" style="background:#ffad66;color:#201007;min-height:48px;margin:8px">Dừng báo thức</button>
         <p id="limitAlarmItems" style="white-space:pre-line;overflow-wrap:anywhere"></p>
         <p id="limitAlarmData"></p>
       </section>
-      <p>Âm APY lặp mỗi 2 giây đến khi bấm Dừng báo thức. Đổi ví hoặc tắt cảnh báo cũng ngắt âm. Dừng xác nhận tất cả market đang báo; cùng market chỉ báo lại sau lần chạm ngưỡng mới hoặc khi sửa thiết lập/bật lại cảnh báo.</p>
-      <p id="queueStatus">Chưa xác minh được vị trí · Chức năng hàng chờ chưa khả dụng: chưa xác minh bộ giải mã order ID, chủ lệnh, phía mua YT, giá gốc và sự kiện khớp/hủy.</p>
-      <button type="button" disabled title="Chỉ bật sau khi đối chiếu bộ giải mã với lệnh thật">Dùng lệnh này làm mốc</button>
-      <p>Nhập APY theo %, ngưỡng không âm theo điểm phần trăm. Báo khi Market APY − My APY ≤ ngưỡng (có dấu, không lấy trị tuyệt đối; chênh lệch âm cũng báo). Sau khi nhập hoặc bật cảnh báo, nếu đã thỏa điều kiện thì báo một lần ở lần kiểm tra APY thành công kế tiếp. Chỉ báo lại khi chênh lệch đã lên trên ngưỡng rồi giảm về bằng hoặc dưới ngưỡng. Để trống để tắt theo dõi market. Lưu riêng theo ví, market và kỳ hạn trên trình duyệt này. Âm báo cần trang đang hoạt động; không bảo đảm khi đóng hoặc đình chỉ tab. Đây không phải bảo đảm lệnh sẽ không khớp.</p>
+      <p>Market APY − My APY ≤ ngưỡng → báo thức đến khi bấm Dừng.</p>
     </div>
-    <p class="apy-note">Range chỉ so với APY nhập tay, không xác nhận lệnh thật nhận thưởng hoặc tránh khớp lệnh. <a href="https://app.exponent.finance/api/orderbook-emissions/campaigns" target="_blank" rel="noopener noreferrer">Nguồn range Exponent</a></p>
-    <p class="apy-note" id="rewardRangeStatus" role="status">Đang tải range…</p>
+    <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Ngày đáo hạn</th><th>Thời gian còn lại</th><th>Implied APY</th><th>My Limit Order APY (%)</th><th>Implied APY range</th><th>Chênh lệch (đpt)</th><th>Ngưỡng (đpt)</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">

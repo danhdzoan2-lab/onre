@@ -1,6 +1,6 @@
 // Queue selection deliberately remains disabled until the on-chain decoder is validated.
-const limitState = { wallet: '', records: {}, edges: new Map(), enabled: false, storageError: false };
-const LIMIT_STORAGE = 'exponent-limit-monitor-v1';
+const limitState = { records: {}, edges: new Map(), enabled: false, storageError: false };
+const LIMIT_STORAGE = 'exponent-limit-monitor-v2';
 let limitAudio = null;
 const limitAlarm = { entries: new Map(), source: null, generation: 0 };
 function renderLimitAlarm() {
@@ -95,39 +95,23 @@ function limitGapAtOrBelow(marketPercent, manualPercent, threshold) {
   return marketPercent - manualPercent - threshold <= tolerance;
 }
 
-function validLimitWallet(value) {
-  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return false;
-  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let n = 0n;
-  for (const c of value) n = n * 58n + BigInt(alphabet.indexOf(c));
-  let bytes = 0;
-  while (n > 0n) { bytes++; n >>= 8n; }
-  return bytes + (value.match(/^1*/) || [''])[0].length === 32;
-}
 function limitNumber(value) {
   if (typeof value !== 'string' || !/^\d+(?:\.\d+)?$/.test(value.trim())) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
-function limitKey(wallet, market) {
-  return JSON.stringify([wallet, market.vaultAddress, market.maturityDateUnixTs]);
+function limitKey(market) {
+  return JSON.stringify([market.vaultAddress, market.maturityDateUnixTs]);
 }
 function saveLimits() {
   try {
-    localStorage.setItem(LIMIT_STORAGE, JSON.stringify({ wallet: limitState.wallet, records: limitState.records }));
+    localStorage.setItem(LIMIT_STORAGE, JSON.stringify({ records: limitState.records }));
     limitState.storageError = false;
   } catch { limitState.storageError = true; }
-  document.getElementById('limitWalletStatus').textContent = limitState.storageError
+  const status = document.getElementById('limitStorageStatus');
+  if (status) status.textContent = limitState.storageError
     ? 'Không lưu được trên trình duyệt; thiết lập chỉ giữ trong phiên này.'
-    : limitState.wallet ? `Ví đang theo dõi APY: ${limitState.wallet}` : 'Nhập ví và bấm Load orders để cấu hình APY.';
-}
-function setLimitWallet(wallet) {
-  stopLimitAlarm();
-  limitState.wallet = wallet;
-  limitState.edges.clear();
-  document.getElementById('limitAlertStatus').textContent = '';
-  saveLimits();
-  renderApy();
+    : '';
 }
 function renderLimitCells(row, assetKey, market) {
   if (!row.limitInputs) {
@@ -156,7 +140,7 @@ function renderLimitCells(row, assetKey, market) {
     });
     row.limitInputs = inputs; row.limitGap = cells[1];
   }
-  const key = limitState.wallet && market ? limitKey(limitState.wallet, market) : '';
+  const key = market ? limitKey(market) : '';
   const record = limitState.records[key] || {};
   if (row.limitKey !== key) {
     row.limitKey = key;
@@ -176,12 +160,12 @@ function renderLimitCells(row, assetKey, market) {
   if (typeof renderRewardRange === 'function') renderRewardRange(row, market, record.apy);
 }
 function evaluateLimitAlerts() {
-  if (!limitState.wallet || apyState.error || !apyState.checkedAt || Date.now() - apyState.checkedAt > 8000) return;
+  if (apyState.error || !apyState.checkedAt || Date.now() - apyState.checkedAt > 8000) return;
   const messages = [];
   for (const [assetKey, asset] of Object.entries(ASSETS)) {
     const market = farthestApyMarket(apyState.markets || [], asset.mint, Date.now() / 1000);
     if (!market) continue;
-    const key = limitKey(limitState.wallet, market), record = limitState.records[key] || {};
+    const key = limitKey(market), record = limitState.records[key] || {};
     const apy = limitNumber(record.apy), threshold = limitNumber(record.threshold);
     if (apy === null || threshold === null || typeof market.impliedApy !== 'number' || !Number.isFinite(market.impliedApy * 100)) {
       limitState.edges.delete(key); continue;
@@ -193,39 +177,36 @@ function evaluateLimitAlerts() {
     if (previous === true || !triggered || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
     const message = `${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`;
     if (!limitAlarm.entries.has(key)) {
-      limitAlarm.entries.set(key, `${message} Ghi nhận: ${apyDate(Date.now())} · Ví ${limitState.wallet}`);
+      limitAlarm.entries.set(key, message);
       messages.push(message);
     }
   }
   if (messages.length) {
-    const body = `${messages.join('\n')}\nVí ${limitState.wallet}`;
+    const body = messages.join('\n');
     startLimitAlarmAudio();
     renderLimitAlarm();
-    document.getElementById('limitAlertStatus').textContent = `Chênh lệch APY ≤ ngưỡng · ${body}`;
     // Synchronous notification creation: no delayed callback can alert for a previous wallet.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try { new Notification('Chênh lệch APY ≤ ngưỡng', { body, tag: `limit-${limitState.wallet}`, silent: true }); } catch { /* Inline alert remains available. */ }
+      try { new Notification('Chênh lệch APY ≤ ngưỡng', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
     }
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
   try {
-    const saved = JSON.parse(localStorage.getItem(LIMIT_STORAGE) || '{}');
+    const current = localStorage.getItem(LIMIT_STORAGE);
+    const saved = JSON.parse(current || '{}');
     if (saved.records && typeof saved.records === 'object' && !Array.isArray(saved.records)) limitState.records = saved.records;
-    if (validLimitWallet(saved.wallet || '')) limitState.wallet = saved.wallet;
-  } catch { /* Corrupt or unavailable storage must not prevent use. */ }
-  const input = document.getElementById('limitWallet');
-  input.value = limitState.wallet;
-  // Stop old-wallet alerts immediately while the user edits the address.
-  input.addEventListener('input', () => { if (input.value.trim() !== limitState.wallet) setLimitWallet(''); });
-  document.getElementById('loadLimitOrders').addEventListener('click', () => {
-    const wallet = input.value.trim();
-    if (!validLimitWallet(wallet)) {
-      document.getElementById('limitWalletStatus').textContent = 'Địa chỉ Solana không hợp lệ (cần public key 32 byte).'; return;
+    if (!current) {
+      const legacy = JSON.parse(localStorage.getItem('exponent-limit-monitor-v1') || '{}');
+      for (const [key, value] of Object.entries(legacy.records || {})) {
+        try {
+          const [wallet, vault, maturity] = JSON.parse(key);
+          if (wallet === legacy.wallet && typeof vault === 'string' && Number.isFinite(maturity))
+            limitState.records[JSON.stringify([vault, maturity])] = value;
+        } catch { /* Ignore malformed legacy keys. */ }
+      }
     }
-    setLimitWallet(wallet);
-    document.getElementById('queueStatus').textContent = 'Chưa xác minh được vị trí · Đã chọn ví, nhưng chưa thể tải danh sách lệnh được xác minh. Chọn mốc và cảnh báo hàng chờ đang tắt; không suy diễn từ giao dịch gần đây.';
-  });
+  } catch { /* Corrupt or unavailable storage must not prevent use. */ }
   document.getElementById('limitAlerts').addEventListener('change', event => {
     limitState.enabled = event.target.checked; limitState.edges.clear();
     if (!limitState.enabled) stopLimitAlarm();

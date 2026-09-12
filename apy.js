@@ -1,11 +1,11 @@
 const APY_ENDPOINT = 'https://app.exponent.finance/api/markets';
 const apyState = { markets: null, checkedAt: 0, error: '', inFlight: false, retryAt: 0 };
 
-function nearestApyMarket(markets, mint, nowSeconds) {
+function farthestApyMarket(markets, mint, nowSeconds) {
   return markets.filter(m => m?.underlyingAsset?.mint === mint && m.marketStatus === 'active'
     && Number.isFinite(m.maturityDateUnixTs) && m.maturityDateUnixTs > nowSeconds
     && typeof m.vaultAddress === 'string')
-    .sort((a, b) => a.maturityDateUnixTs - b.maturityDateUnixTs || a.vaultAddress.localeCompare(b.vaultAddress))[0] || null;
+    .sort((a, b) => b.maturityDateUnixTs - a.maturityDateUnixTs || a.vaultAddress.localeCompare(b.vaultAddress))[0] || null;
 }
 
 function formatImpliedApy(value) {
@@ -45,7 +45,7 @@ function renderApy() {
       body.appendChild(row);
     }
     row.hidden = selectedAssets.size > 0 && !selectedAssets.has(key);
-    const market = nearestApyMarket(apyState.markets || [], asset.mint, now / 1000);
+    const market = farthestApyMarket(apyState.markets || [], asset.mint, now / 1000);
     const minutes = market ? Math.max(1, Math.ceil((market.maturityDateUnixTs * 1000 - now) / 60000)) : 0;
     const remaining = minutes >= 1440 ? `${Math.floor(minutes / 1440)} ngày ${Math.floor(minutes % 1440 / 60)} giờ`
       : `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`;

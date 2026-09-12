@@ -15,7 +15,7 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 ## Features
 
 - Market Implied APY table reads the public Exponent `/api/markets` endpoint every 2 seconds (source cache: 30 seconds).
-- Matches underlying mint and selects the nearest active maturity; shared market APY is independent of the CLMM/Orderbook selector and follows the multi-token filter.
+- Matches underlying mint and selects the farthest active maturity; shared market APY is independent of the CLMM/Orderbook selector and follows the multi-token filter.
 - Displays Asia/Saigon maturity times, remaining time, and last successful check. Preserves stale data on failure and respects HTTP 429 Retry-After.
 - Run `node tests/apy.test.cjs` to verify APY selection, rendering, and request recovery.
 

@@ -52,6 +52,7 @@ function renderApy() {
     const values = [asset.label, market ? apyDate(market.maturityDateUnixTs * 1000)
       : apyState.markets ? 'Chưa có market còn hạn' : '—', market ? remaining : '—', market ? formatImpliedApy(market.impliedApy) : '—'];
     values.forEach((value, i) => { if (row.children[i].textContent !== value) row.children[i].textContent = value; });
+    if (typeof renderLimitCells === 'function') renderLimitCells(row, key, market);
   }
   const status = document.getElementById('apyStatus');
   status.dataset.stale = String(Boolean(apyState.error));
@@ -78,6 +79,7 @@ async function fetchApy() {
     apyState.checkedAt = Date.now();
     apyState.error = '';
     apyState.retryAt = 0;
+    if (typeof evaluateLimitAlerts === 'function') evaluateLimitAlerts();
   } catch (error) {
     apyState.error = error.name === 'AbortError' ? 'Nguồn APY phản hồi quá chậm' : error.message || 'Không tải được APY';
   } finally {

@@ -58,3 +58,11 @@ The main constants are in `index.html`:
 - `DEFAULT_HIGH_VOLUME_THRESHOLD`
 
 No environment variables are required.
+
+## Manual limit APY monitor
+
+Wallet address, manual APY and nonnegative threshold (percentage points) are stored in browser localStorage, scoped by wallet + vault address + exact maturity. Empty/invalid inputs disable that market's alert. Refresh never overwrites the input. Alerts require opt-in each page session and fire only on an observed outside-to-inside threshold transition after a successful APY fetch, respecting token filters. Reload, wallet changes, input edits and enabling alerts establish new baselines. Desktop notifications require permission; inline alerts remain available. No background monitoring is promised when the page is closed.
+
+Queue monitoring is intentionally **unavailable**, including marker selection, queue checkpoints, fill alerts and claims of position. The public `/api/orderbooks` catalog exposes aggregate book/vault metadata, not verified individual orders. The sample wallet transaction `3xdeXesYNYYA92YDZJmwjBhd7nYAS5KzM1o2ZT814UhdnWGfnbN5yp3gMaZoLRJbzXXycGUuEYwrRW8VnQ7oquV7` contains successful `WrapperPostOffer` and `PostOffer` instructions, but the complete order/event decoder has not been validated. Do not enable this gate until owner, order ID, buy-YT side, exact price, execution ordering, partial fills and cancellation are reconciled against real orders. A complete paginated event synchronizer with persisted checkpoints and resync before notifications is still required; the 20-row activity feed is not a substitute.
+
+Tests: `node tests/apy.test.cjs` and `node tests/limit-monitor.test.cjs`.

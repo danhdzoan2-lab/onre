@@ -93,7 +93,7 @@ function renderLimitCells(row, assetKey, market) {
         const record = limitState.records[row.limitKey] || {};
         record[field] = input.value;
         limitState.records[row.limitKey] = record;
-        limitState.edges.delete(row.limitKey); // Editing establishes a new baseline, never an alert.
+        limitState.edges.delete(row.limitKey); // Recheck edited settings on the next successful APY fetch.
         saveLimits(); renderApy();
       });
       const cell = cells[index === 0 ? 0 : 2];
@@ -139,7 +139,7 @@ function evaluateLimitAlerts() {
     const exceeded = limitGapExceeded(market.impliedApy * 100, apy, threshold);
     const previous = limitState.edges.get(key);
     limitState.edges.set(key, exceeded);
-    if (previous !== false || !exceeded || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
+    if (previous === true || !exceeded || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
     messages.push(`${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`);
   }
   if (messages.length) {

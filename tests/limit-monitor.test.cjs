@@ -36,7 +36,9 @@ assert.equal(notices, 2);
 run(`setLimitWallet(''); evaluateLimitAlerts();`);
 assert.equal(notices, 2);
 run(`setLimitWallet('${wallet}'); evaluateLimitAlerts();`);
-assert.equal(notices, 2); // Restored wallet starts with a baseline, not an alert.
+assert.equal(notices, 3); // Restored wallet alerts once on the next fresh evaluation if exceeded.
+run(`evaluateLimitAlerts()`);
+assert.equal(notices, 3);
 assert.notEqual(run(`limitKey('${wallet}',market)`), run(`limitKey('${wallet}',{...market,maturityDateUnixTs:1})`));
 ctx.row = el();
 run(`renderLimitCells(row,'onyc',market); row.limitInputs[0].value='10.03'; row.limitInputs[0].input(); renderLimitCells(row,'onyc',market);`);
@@ -46,7 +48,7 @@ assert.equal(ctx.row.limitInputs[0].value, '');
 run(`renderLimitCells(row,'onyc',market)`);
 assert.equal(ctx.row.limitInputs[0].value, '10.03');
 run(`market.impliedApy=.12; evaluateLimitAlerts(); selectedAssets.add('other'); market.impliedApy=.10; evaluateLimitAlerts();`);
-assert.equal(notices, 2);
+assert.equal(notices, 4); // Editing a valid APY re-arms the next fresh evaluation.
 console.log('Limit monitor tests passed');
 for (const [m, manual, threshold, expected] of [[10.1,10,.1,false],[9.9,10,.1,false],[10.11,10,.1,true],[9.89,10,.1,true],[10,10,0,false],[10.001,10,0,true]]) {
   assert.equal(run(`limitGapExceeded(${m},${manual},${threshold})`), expected);
@@ -54,7 +56,7 @@ for (const [m, manual, threshold, expected] of [[10.1,10,.1,false],[9.9,10,.1,fa
 run(`row.limitInputs[1].value='-0.1'; row.limitInputs[1].input(); renderLimitCells(row,'onyc',market);`);
 assert.match(ctx.row.limitInputs[1].limitError.textContent, /không âm/);
 run(`evaluateLimitAlerts()`);
-assert.equal(notices, 2);
+assert.equal(notices, 4);
 // One sound + notification for two markets; denied notifications do not mute sound.
 run(`selectedAssets.clear(); limitState.edges.clear();
 ASSETS.second={label:'Second',mint:'second'};
@@ -70,16 +72,23 @@ ctx.fakeAudio = {state:'running',currentTime:0,destination:{},
   createGain(){return {connect(){},disconnect(){},gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}}};}
 };
 run(`limitAudio=fakeAudio; evaluateLimitAlerts(); market.impliedApy=.102; second.impliedApy=.098; evaluateLimitAlerts(); evaluateLimitAlerts();`);
-assert.equal(notices,3);
+assert.equal(notices,5);
 assert.deepEqual(tones,[1046.5,1318.5,1568]);
 run(`market.impliedApy=.10; second.impliedApy=.10; evaluateLimitAlerts(); Notification.permission='denied'; market.impliedApy=.102; evaluateLimitAlerts();`);
-assert.equal(notices,3);
+assert.equal(notices,5);
 assert.equal(tones.length,6);
 run(`market.impliedApy=.10; evaluateLimitAlerts(); apyState.checkedAt=1; market.impliedApy=.102; evaluateLimitAlerts();`);
 assert.equal(tones.length,6);
 run(`apyState.checkedAt=Date.now(); selectedAssets.add('second'); evaluateLimitAlerts(); selectedAssets.clear(); evaluateLimitAlerts();`);
 assert.equal(tones.length,6); // Filtered crossing is not replayed.
 console.log('PASS: absolute boundary, negative inputs, grouped sound, denied notification, stale data, filter replay');
+run(`limitState.enabled=false; limitState.edges.clear(); evaluateLimitAlerts();`);
+assert.equal(tones.length,6);
+run(`limitState.enabled=true; limitState.edges.clear(); apyState.error='offline'; evaluateLimitAlerts();`);
+assert.equal(tones.length,6);
+run(`apyState.error=''; evaluateLimitAlerts(); evaluateLimitAlerts();`);
+assert.equal(tones.length,9); // Enabling while already exceeded alerts once, only with fresh data.
+console.log('PASS: already exceeded on enable, no repeat, no stale initial alert');
 elements.set('limitAudioStatus',el());
 (async()=>{
   ctx.fakeAudio.resume=async()=>{ctx.fakeAudio.state='running';};
@@ -90,6 +99,6 @@ elements.set('limitAudioStatus',el());
   assert.equal(await run('unlockLimitAudio()'),false);
   assert.match(elements.get('limitAudioStatus').textContent,/âm thanh/);
   run('playLimitApyAlert()');
-  assert.equal(tones.length,6);
+  assert.equal(tones.length,9);
   console.log('PASS: audio unlock and blocked playback guidance');
 })().catch(error=>{console.error(error);process.exitCode=1;});

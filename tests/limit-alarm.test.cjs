@@ -12,7 +12,7 @@ apyState.markets=['a','b'].map(mint=>({mint,vaultAddress:mint,maturityDateUnixTs
 for(const m of apyState.markets)limitState.records[limitKey(m)]={apy:'10',threshold:'0.1'};
 evaluateLimitAlerts();evaluateLimitAlerts();`);
 assert.equal(starts,1);assert.equal(notices,1);assert.equal(run('limitAlarm.source.loop'),true);
-assert.equal(run('limitAlarm.source.buffer.getChannelData(0).length'),2000);
+assert.equal(run('limitAlarm.source.buffer.getChannelData(0).length'),880);
 assert.equal(run('limitAlarm.entries.size'),2);
 run(`apyState.markets.forEach(m=>m.impliedApy=.2);evaluateLimitAlerts();apyState.error='offline';renderLimitAlarm();`);
 assert.equal(stops,0);assert.match(elements.get('limitAlarmData').textContent,/mất kết nối/);

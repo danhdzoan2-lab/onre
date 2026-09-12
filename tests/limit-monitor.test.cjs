@@ -72,21 +72,21 @@ ctx.fakeAudio = {state:'running',currentTime:0,destination:{},
 };
 run(`limitAudio=fakeAudio; evaluateLimitAlerts(); market.impliedApy=.101; second.impliedApy=.098; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(notices,5);
-assert.deepEqual(tones,[1046.5,1318.5,1568]);
+assert.deepEqual(tones,[220,660,880,660]);
 run(`market.impliedApy=.102; second.impliedApy=.102; evaluateLimitAlerts(); Notification.permission='denied'; market.impliedApy=.10; evaluateLimitAlerts();`);
 assert.equal(notices,5);
-assert.equal(tones.length,6);
+assert.equal(tones.length,8);
 run(`market.impliedApy=.102; evaluateLimitAlerts(); apyState.checkedAt=1; market.impliedApy=.10; evaluateLimitAlerts();`);
-assert.equal(tones.length,6);
+assert.equal(tones.length,8);
 run(`apyState.checkedAt=Date.now(); selectedAssets.add('second'); evaluateLimitAlerts(); selectedAssets.clear(); evaluateLimitAlerts();`);
-assert.equal(tones.length,6); // Filtered crossing is not replayed.
+assert.equal(tones.length,8); // Filtered crossing is not replayed.
 console.log('PASS: signed <= boundary, negative gap, invalid inputs, grouped sound, denied notification, stale data, filter replay');
 run(`limitState.enabled=false; limitState.edges.clear(); evaluateLimitAlerts();`);
-assert.equal(tones.length,6);
+assert.equal(tones.length,8);
 run(`limitState.enabled=true; limitState.edges.clear(); apyState.error='offline'; evaluateLimitAlerts();`);
-assert.equal(tones.length,6);
+assert.equal(tones.length,8);
 run(`apyState.error=''; evaluateLimitAlerts(); evaluateLimitAlerts();`);
-assert.equal(tones.length,9); // Enabling while already <= threshold alerts once, only with fresh data.
+assert.equal(tones.length,12); // Enabling while already <= threshold alerts once, only with fresh data.
 console.log('PASS: already at/below threshold on enable, no repeat, no stale initial alert');
 elements.set('limitAudioStatus',el());
 run(`startLimitAlarmAudio=()=>{};`); // Unlock tests below exercise only the one-shot test chime.
@@ -99,6 +99,6 @@ run(`startLimitAlarmAudio=()=>{};`); // Unlock tests below exercise only the one
   assert.equal(await run('unlockLimitAudio()'),false);
   assert.match(elements.get('limitAudioStatus').textContent,/âm thanh/);
   run('playLimitApyAlert()');
-  assert.equal(tones.length,9);
+  assert.equal(tones.length,12);
   console.log('PASS: audio unlock and blocked playback guidance');
 })().catch(error=>{console.error(error);process.exitCode=1;});

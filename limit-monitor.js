@@ -18,14 +18,18 @@ function startLimitAlarmAudio() {
     limitAudioStatus('Báo thức đang chờ âm thanh. Bấm Thử âm APY để mở khóa.'); return;
   }
   try {
-    // A two-second PCM loop runs on the audio clock, independent of polling timers.
+    // Continuous high-volume-style alarm on the audio clock; no silent polling gap.
     const rate = limitAudio.sampleRate;
-    const buffer = limitAudio.createBuffer(1, rate * 2, rate), samples = buffer.getChannelData(0);
-    [1046.5, 1318.5, 1568].forEach((frequency, index) => {
-      for (let n = 0; n < Math.floor(rate * 0.19); n++) {
+    const buffer = limitAudio.createBuffer(1, Math.round(rate * 0.88), rate), samples = buffer.getChannelData(0);
+    [220, 660, 880, 660].forEach((frequency, index) => {
+      for (let n = 0; n < Math.floor(rate * 0.22); n++) {
         const t = n / rate;
-        const envelope = t < 0.015 ? t / 0.015 : Math.exp(-35 * (t - 0.015));
-        samples[Math.floor(index * 0.22 * rate) + n] = 0.25 * envelope * Math.sin(2 * Math.PI * frequency * t);
+        const envelope = Math.min(1, t / 0.008, (0.22 - t) / 0.008);
+        // Band-limited sawtooth approximation avoids harsh aliased high harmonics.
+        let wave = 0;
+        for (let harmonic = 1; harmonic <= Math.min(12, Math.floor(rate / (2 * frequency))); harmonic++)
+          wave += Math.sin(2 * Math.PI * frequency * harmonic * t) / harmonic;
+        samples[Math.floor(index * 0.22 * rate) + n] = 0.65 * envelope * (2 / Math.PI) * wave;
       }
     });
     const source = limitAudio.createBufferSource();
@@ -75,16 +79,17 @@ function playLimitApyAlert() {
     limitAudioStatus('Âm APY chưa sẵn sàng. Bấm Thử âm APY để mở khóa âm thanh.'); return;
   }
   try {
-    [1046.5, 1318.5, 1568].forEach((frequency, i) => {
+    [220, 660, 880, 660].forEach((frequency, i) => {
       const oscillator = limitAudio.createOscillator(), gain = limitAudio.createGain();
       oscillator.connect(gain); gain.connect(limitAudio.destination);
-      oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+      oscillator.type = 'sawtooth'; oscillator.frequency.value = frequency;
       const start = limitAudio.currentTime + i * 0.22;
       gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.25, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.17);
+      gain.gain.linearRampToValueAtTime(0.65, start + 0.008);
+      gain.gain.setValueAtTime(0.65, start + 0.212);
+      gain.gain.linearRampToValueAtTime(0, start + 0.22);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-      oscillator.start(start); oscillator.stop(start + 0.19);
+      oscillator.start(start); oscillator.stop(start + 0.22);
     });
     limitAudioStatus('');
   } catch { limitAudioStatus('Không phát được âm APY. Bấm Thử âm APY để thử lại.'); }

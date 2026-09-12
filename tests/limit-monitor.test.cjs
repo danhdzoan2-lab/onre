@@ -21,13 +21,15 @@ assert.equal(run(`validLimitWallet('bad')`), false);
 for (const v of ['', ' ', '-1', 'NaN', 'Infinity', '1e4', '10x']) assert.equal(run(`limitNumber(${JSON.stringify(v)})`), null);
 assert.equal(run(`limitNumber('0')`), 0);
 run(`setLimitWallet('${wallet}'); limitState.enabled=true;
-apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.12}];
+apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.10}];
 const market=apyState.markets[0]; const key=limitKey(limitState.wallet,market);
 limitState.records[key]={apy:'10',threshold:'0.1'}; evaluateLimitAlerts();`);
 assert.equal(notices, 0);
-run(`market.impliedApy=.101; evaluateLimitAlerts(); evaluateLimitAlerts();`);
+run(`market.impliedApy=.101; evaluateLimitAlerts();`);
+assert.equal(notices, 0); // Exactly equal is not exceeded, despite binary rounding.
+run(`market.impliedApy=.102; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(notices, 1);
-run(`market.impliedApy=.12; evaluateLimitAlerts(); apyState.error='offline'; market.impliedApy=.10; evaluateLimitAlerts();`);
+run(`market.impliedApy=.10; evaluateLimitAlerts(); apyState.error='offline'; market.impliedApy=.098; evaluateLimitAlerts();`);
 assert.equal(notices, 1);
 run(`apyState.error=''; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
@@ -46,3 +48,48 @@ assert.equal(ctx.row.limitInputs[0].value, '10.03');
 run(`market.impliedApy=.12; evaluateLimitAlerts(); selectedAssets.add('other'); market.impliedApy=.10; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
 console.log('Limit monitor tests passed');
+for (const [m, manual, threshold, expected] of [[10.1,10,.1,false],[9.9,10,.1,false],[10.11,10,.1,true],[9.89,10,.1,true],[10,10,0,false],[10.001,10,0,true]]) {
+  assert.equal(run(`limitGapExceeded(${m},${manual},${threshold})`), expected);
+}
+run(`row.limitInputs[1].value='-0.1'; row.limitInputs[1].input(); renderLimitCells(row,'onyc',market);`);
+assert.match(ctx.row.limitInputs[1].limitError.textContent, /không âm/);
+run(`evaluateLimitAlerts()`);
+assert.equal(notices, 2);
+// One sound + notification for two markets; denied notifications do not mute sound.
+run(`selectedAssets.clear(); limitState.edges.clear();
+ASSETS.second={label:'Second',mint:'second'};
+const second={...market,vaultAddress:'v2',underlyingAsset:{mint:'second'},impliedApy:.10};
+market.underlyingAsset={mint:'mint'}; market.impliedApy=.10;
+apyState.markets.push(second);
+farthestApyMarket=(ms,mint)=>ms.find(m=>m.underlyingAsset.mint===mint);
+limitState.records[key]={apy:'10',threshold:'0.1'};
+limitState.records[limitKey(limitState.wallet,second)]={apy:'10',threshold:'0.1'};`);
+let tones = [];
+ctx.fakeAudio = {state:'running',currentTime:0,destination:{},
+  createOscillator(){const osc={frequency:{value:0},connect(){},disconnect(){},start(){tones.push(osc.frequency.value);},stop(){}};return osc;},
+  createGain(){return {connect(){},disconnect(){},gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}}};}
+};
+run(`limitAudio=fakeAudio; evaluateLimitAlerts(); market.impliedApy=.102; second.impliedApy=.098; evaluateLimitAlerts(); evaluateLimitAlerts();`);
+assert.equal(notices,3);
+assert.deepEqual(tones,[1046.5,1318.5,1568]);
+run(`market.impliedApy=.10; second.impliedApy=.10; evaluateLimitAlerts(); Notification.permission='denied'; market.impliedApy=.102; evaluateLimitAlerts();`);
+assert.equal(notices,3);
+assert.equal(tones.length,6);
+run(`market.impliedApy=.10; evaluateLimitAlerts(); apyState.checkedAt=1; market.impliedApy=.102; evaluateLimitAlerts();`);
+assert.equal(tones.length,6);
+run(`apyState.checkedAt=Date.now(); selectedAssets.add('second'); evaluateLimitAlerts(); selectedAssets.clear(); evaluateLimitAlerts();`);
+assert.equal(tones.length,6); // Filtered crossing is not replayed.
+console.log('PASS: absolute boundary, negative inputs, grouped sound, denied notification, stale data, filter replay');
+elements.set('limitAudioStatus',el());
+(async()=>{
+  ctx.fakeAudio.resume=async()=>{ctx.fakeAudio.state='running';};
+  ctx.fakeAudio.state='suspended';
+  assert.equal(await run('unlockLimitAudio()'),true);
+  ctx.fakeAudio.state='suspended';
+  ctx.fakeAudio.resume=async()=>{throw new Error('blocked');};
+  assert.equal(await run('unlockLimitAudio()'),false);
+  assert.match(elements.get('limitAudioStatus').textContent,/âm thanh/);
+  run('playLimitApyAlert()');
+  assert.equal(tones.length,6);
+  console.log('PASS: audio unlock and blocked playback guidance');
+})().catch(error=>{console.error(error);process.exitCode=1;});

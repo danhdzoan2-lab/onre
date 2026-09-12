@@ -93,6 +93,17 @@
     .filter-button[aria-pressed="true"]:hover { background: #32e2aa; color: #03100b; }
     .tx-badge { background: var(--accent-soft); border: 1px solid rgba(0, 214, 143, 0.24); border-radius: var(--radius); padding: 7px 10px; font-size: 0.76rem; font-weight: 750; color: var(--accent); white-space: nowrap; }
     .table-wrapper { overflow-x: auto; }
+    .apy-note { padding: 0 16px; margin: 10px 0; color: var(--muted); font-size: 0.78rem; }
+    .apy-table { min-width: 0; }
+    #apyStatus[data-stale="true"] { color: var(--amber); }
+    @media (max-width: 720px) {
+      .apy-table thead { display: none; }
+      .apy-table, .apy-table tbody { display: block; }
+      .apy-table tr { display: grid; margin: 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+      .apy-table tr[hidden] { display: none; }
+      .apy-table td { display: flex; justify-content: space-between; gap: 12px; }
+      .apy-table td::before { content: attr(data-label); color: var(--muted); }
+    }
     table { width: 100%; border-collapse: collapse; min-width: 840px; }
     th { text-align: left; padding: 12px 14px; background: #0b0d0a; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); border-bottom: 1px solid var(--line); }
     td { padding: 12px 14px; border-bottom: 1px solid var(--line-soft); font-size: 0.84rem; vertical-align: middle; color: #dce2d4; }
@@ -212,6 +223,12 @@
     <div id="refreshTime" class="refresh-time">Last updated --:--:--</div>
   </section>
 
+  <section class="table-panel" aria-labelledby="apyTitle">
+    <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Nearest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
+    <p class="apy-note">Kiểm tra mỗi 2 giây · Nguồn có cache 30 giây, không đảm bảo có APY mới mỗi lần kiểm tra. Áp dụng các bộ lọc token bên dưới.</p>
+    <p class="apy-note" id="apyStatus" role="status">Đang tải APY…</p>
+    <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Ngày đáo hạn</th><th>Thời gian còn lại</th><th>Implied APY</th></tr></thead><tbody id="apyRows"></tbody></table></div>
+  </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
       <div class="panel-heading">
@@ -562,6 +579,7 @@
     });
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     renderCurrentTransactions();
+    renderApy();
     updateNotifUI();
   }
 
@@ -959,6 +977,7 @@
   window.addEventListener('resize', () => { if (currentTxs.length) renderCurrentTransactions(); });
   window.addEventListener('load', async () => { initHighVolumeThreshold(); await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>
+<script src="apy.js"></script>
 <style>
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }

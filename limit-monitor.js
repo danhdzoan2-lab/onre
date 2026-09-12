@@ -40,10 +40,10 @@ function playLimitApyAlert() {
     limitAudioStatus('');
   } catch { limitAudioStatus('Không phát được âm APY. Bấm Thử âm APY để thử lại.'); }
 }
-function limitGapExceeded(marketPercent, manualPercent, threshold) {
+function limitGapAtOrBelow(marketPercent, manualPercent, threshold) {
   // Tolerance only removes floating-point subtraction noise at an equal boundary.
   const tolerance = Number.EPSILON * Math.max(1, Math.abs(marketPercent), Math.abs(manualPercent), threshold) * 4;
-  return Math.abs(marketPercent - manualPercent) - threshold > tolerance;
+  return marketPercent - manualPercent - threshold <= tolerance;
 }
 
 function validLimitWallet(value) {
@@ -136,19 +136,19 @@ function evaluateLimitAlerts() {
       limitState.edges.delete(key); continue;
     }
     const gap = market.impliedApy * 100 - apy;
-    const exceeded = limitGapExceeded(market.impliedApy * 100, apy, threshold);
+    const triggered = limitGapAtOrBelow(market.impliedApy * 100, apy, threshold);
     const previous = limitState.edges.get(key);
-    limitState.edges.set(key, exceeded);
-    if (previous === true || !exceeded || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
+    limitState.edges.set(key, triggered);
+    if (previous === true || !triggered || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
     messages.push(`${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`);
   }
   if (messages.length) {
     const body = `${messages.join('\n')}\nVí ${limitState.wallet}`;
     playLimitApyAlert();
-    document.getElementById('limitAlertStatus').textContent = `Khoảng cách APY vượt ngưỡng · ${body}`;
+    document.getElementById('limitAlertStatus').textContent = `Chênh lệch APY ≤ ngưỡng · ${body}`;
     // Synchronous notification creation: no delayed callback can alert for a previous wallet.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try { new Notification('Khoảng cách APY vượt ngưỡng', { body, tag: `limit-${limitState.wallet}`, silent: true }); } catch { /* Inline alert remains available. */ }
+      try { new Notification('Chênh lệch APY ≤ ngưỡng', { body, tag: `limit-${limitState.wallet}`, silent: true }); } catch { /* Inline alert remains available. */ }
     }
   }
 }

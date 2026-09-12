@@ -21,22 +21,22 @@ assert.equal(run(`validLimitWallet('bad')`), false);
 for (const v of ['', ' ', '-1', 'NaN', 'Infinity', '1e4', '10x']) assert.equal(run(`limitNumber(${JSON.stringify(v)})`), null);
 assert.equal(run(`limitNumber('0')`), 0);
 run(`setLimitWallet('${wallet}'); limitState.enabled=true;
-apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.10}];
+apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.102}];
 const market=apyState.markets[0]; const key=limitKey(limitState.wallet,market);
 limitState.records[key]={apy:'10',threshold:'0.1'}; evaluateLimitAlerts();`);
 assert.equal(notices, 0);
-run(`market.impliedApy=.101; evaluateLimitAlerts();`);
-assert.equal(notices, 0); // Exactly equal is not exceeded, despite binary rounding.
-run(`market.impliedApy=.102; evaluateLimitAlerts(); evaluateLimitAlerts();`);
+run(`market.impliedApy=.1011; evaluateLimitAlerts();`);
+assert.equal(notices, 0);
+run(`market.impliedApy=.101; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(notices, 1);
-run(`market.impliedApy=.10; evaluateLimitAlerts(); apyState.error='offline'; market.impliedApy=.098; evaluateLimitAlerts();`);
+run(`market.impliedApy=.102; evaluateLimitAlerts(); apyState.error='offline'; market.impliedApy=.098; evaluateLimitAlerts();`);
 assert.equal(notices, 1);
 run(`apyState.error=''; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
 run(`setLimitWallet(''); evaluateLimitAlerts();`);
 assert.equal(notices, 2);
 run(`setLimitWallet('${wallet}'); evaluateLimitAlerts();`);
-assert.equal(notices, 3); // Restored wallet alerts once on the next fresh evaluation if exceeded.
+assert.equal(notices, 3); // Restored wallet alerts once when the signed gap is already <= threshold.
 run(`evaluateLimitAlerts()`);
 assert.equal(notices, 3);
 assert.notEqual(run(`limitKey('${wallet}',market)`), run(`limitKey('${wallet}',{...market,maturityDateUnixTs:1})`));
@@ -47,11 +47,11 @@ run(`renderLimitCells(row,'onyc',{...market,maturityDateUnixTs:1})`);
 assert.equal(ctx.row.limitInputs[0].value, '');
 run(`renderLimitCells(row,'onyc',market)`);
 assert.equal(ctx.row.limitInputs[0].value, '10.03');
-run(`market.impliedApy=.12; evaluateLimitAlerts(); selectedAssets.add('other'); market.impliedApy=.10; evaluateLimitAlerts();`);
+run(`market.impliedApy=.10; evaluateLimitAlerts(); selectedAssets.add('other'); market.impliedApy=.098; evaluateLimitAlerts();`);
 assert.equal(notices, 4); // Editing a valid APY re-arms the next fresh evaluation.
 console.log('Limit monitor tests passed');
-for (const [m, manual, threshold, expected] of [[10.1,10,.1,false],[9.9,10,.1,false],[10.11,10,.1,true],[9.89,10,.1,true],[10,10,0,false],[10.001,10,0,true]]) {
-  assert.equal(run(`limitGapExceeded(${m},${manual},${threshold})`), expected);
+for (const [m, manual, threshold, expected] of [[10.1,10,.1,true],[9.9,10,.1,true],[10.11,10,.1,false],[9.89,10,.1,true],[10,10,0,true],[10.001,10,0,false],[9,10,.1,true],[10.53,10.03,.4,false],[10.43,10.03,.4,true]]) {
+  assert.equal(run(`limitGapAtOrBelow(${m},${manual},${threshold})`), expected);
 }
 run(`row.limitInputs[1].value='-0.1'; row.limitInputs[1].input(); renderLimitCells(row,'onyc',market);`);
 assert.match(ctx.row.limitInputs[1].limitError.textContent, /không âm/);
@@ -60,8 +60,8 @@ assert.equal(notices, 4);
 // One sound + notification for two markets; denied notifications do not mute sound.
 run(`selectedAssets.clear(); limitState.edges.clear();
 ASSETS.second={label:'Second',mint:'second'};
-const second={...market,vaultAddress:'v2',underlyingAsset:{mint:'second'},impliedApy:.10};
-market.underlyingAsset={mint:'mint'}; market.impliedApy=.10;
+const second={...market,vaultAddress:'v2',underlyingAsset:{mint:'second'},impliedApy:.102};
+market.underlyingAsset={mint:'mint'}; market.impliedApy=.102;
 apyState.markets.push(second);
 farthestApyMarket=(ms,mint)=>ms.find(m=>m.underlyingAsset.mint===mint);
 limitState.records[key]={apy:'10',threshold:'0.1'};
@@ -71,24 +71,24 @@ ctx.fakeAudio = {state:'running',currentTime:0,destination:{},
   createOscillator(){const osc={frequency:{value:0},connect(){},disconnect(){},start(){tones.push(osc.frequency.value);},stop(){}};return osc;},
   createGain(){return {connect(){},disconnect(){},gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}}};}
 };
-run(`limitAudio=fakeAudio; evaluateLimitAlerts(); market.impliedApy=.102; second.impliedApy=.098; evaluateLimitAlerts(); evaluateLimitAlerts();`);
+run(`limitAudio=fakeAudio; evaluateLimitAlerts(); market.impliedApy=.101; second.impliedApy=.098; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(notices,5);
 assert.deepEqual(tones,[1046.5,1318.5,1568]);
-run(`market.impliedApy=.10; second.impliedApy=.10; evaluateLimitAlerts(); Notification.permission='denied'; market.impliedApy=.102; evaluateLimitAlerts();`);
+run(`market.impliedApy=.102; second.impliedApy=.102; evaluateLimitAlerts(); Notification.permission='denied'; market.impliedApy=.10; evaluateLimitAlerts();`);
 assert.equal(notices,5);
 assert.equal(tones.length,6);
-run(`market.impliedApy=.10; evaluateLimitAlerts(); apyState.checkedAt=1; market.impliedApy=.102; evaluateLimitAlerts();`);
+run(`market.impliedApy=.102; evaluateLimitAlerts(); apyState.checkedAt=1; market.impliedApy=.10; evaluateLimitAlerts();`);
 assert.equal(tones.length,6);
 run(`apyState.checkedAt=Date.now(); selectedAssets.add('second'); evaluateLimitAlerts(); selectedAssets.clear(); evaluateLimitAlerts();`);
 assert.equal(tones.length,6); // Filtered crossing is not replayed.
-console.log('PASS: absolute boundary, negative inputs, grouped sound, denied notification, stale data, filter replay');
+console.log('PASS: signed <= boundary, negative gap, invalid inputs, grouped sound, denied notification, stale data, filter replay');
 run(`limitState.enabled=false; limitState.edges.clear(); evaluateLimitAlerts();`);
 assert.equal(tones.length,6);
 run(`limitState.enabled=true; limitState.edges.clear(); apyState.error='offline'; evaluateLimitAlerts();`);
 assert.equal(tones.length,6);
 run(`apyState.error=''; evaluateLimitAlerts(); evaluateLimitAlerts();`);
-assert.equal(tones.length,9); // Enabling while already exceeded alerts once, only with fresh data.
-console.log('PASS: already exceeded on enable, no repeat, no stale initial alert');
+assert.equal(tones.length,9); // Enabling while already <= threshold alerts once, only with fresh data.
+console.log('PASS: already at/below threshold on enable, no repeat, no stale initial alert');
 elements.set('limitAudioStatus',el());
 (async()=>{
   ctx.fakeAudio.resume=async()=>{ctx.fakeAudio.state='running';};

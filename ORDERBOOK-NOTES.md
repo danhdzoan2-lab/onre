@@ -45,8 +45,9 @@ Execution comparisons use slot, transaction index, outer instruction and inner
 event index, never API list order or timestamps. Missing execution indices leave
 the comparison unverified.
 
-Only verified Post Offer variants (FillOrKill option, no immediate fills, non-null
-offer index) are currently decoded. Unsupported historical Post Offers stop the
+Post Offer events include the FillOrKill option, optional offer index and filled
+offer vector. Events without a queued offer index are not markable and are excluded
+from later-post counts. Unsupported historical Post Offers stop the
 history checkpoint and show incomplete history; the independent live queue still
 works. Checkpoints advance only after all pages/transactions reach the previous
 checkpoint or initial markers. History is bounded to 10,000 decoded events per

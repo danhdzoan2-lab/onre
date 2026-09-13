@@ -22,7 +22,7 @@ async function orderRpc(method,params){
   }finally{clearTimeout(timer);}
 }
 function orderMarkButtons(tx){
-  return (tx.postOffers||[]).filter(e=>e.side===2&&!e.virtual&&e.owner===tx.from).map(e=>{
+  return (tx.postOffers||[]).filter(e=>e.id>0&&e.side===2&&!e.virtual&&e.owner===tx.from).map(e=>{
     const m={...e,signature:tx.sig},saved=orderWatch.markers.some(x=>orderKey(x)===orderKey(m));
     return `<button type="button" class="mark-order" data-mark-signature="${escapeHtml(tx.sig)}" data-mark-event="${e.outer}:${e.inner}" ${saved?'disabled':''}>${saved?'Marked':`Mark #${e.id}`}</button>`;
   }).join('');
@@ -31,7 +31,7 @@ async function importOrderMarker(signature,eventId){
   const tx=await orderRpc('getTransaction',[signature,{encoding:'json',maxSupportedTransactionVersion:0,commitment:'finalized'}]);
   if(!tx||tx.meta?.err)throw Error('A successful, finalized Post Offer is required');
   const signer=tx.transaction.message.accountKeys[0];
-  const events=ExponentBook.postEvents(tx).filter(e=>e.side===2&&!e.virtual&&e.owner===signer&&(!eventId||`${e.outer}:${e.inner}`===eventId));
+  const events=ExponentBook.postEvents(tx).filter(e=>e.id>0&&e.side===2&&!e.virtual&&e.owner===signer&&(!eventId||`${e.outer}:${e.inner}`===eventId));
   if(!events.length)throw Error('No supported buy-YT Post Offer found. This event cannot be verified yet.');
   for(const e of events){
     const m={...e,signature};if(!validMarker(m))throw Error('Invalid Post Offer data');
@@ -76,14 +76,14 @@ function renderOrderMarkers(){
           const sum=xs=>{let n=0;for(const o of xs){const v=qty(o);if(v===null)return null;n+=v;}return n;};
           const format=n=>n===null||!Number.isInteger(market?.decimals)?'—':(n/10**market.decimals).toLocaleString('en-US',{maximumFractionDigits:2});
           metrics=`<div class="order-metrics"><span>My est. YT<strong>${format(qty(p.offer))}</strong></span><span>Ahead · ${p.ahead.length} orders<strong>${format(sum(p.ahead))} YT</strong></span><span>Behind · ${p.behind.length} orders<strong>${format(sum(p.behind))} YT</strong></span></div>`;
-          note=p.offer.amount<BigInt(m.amount)?'Remaining amount decreased since placement.':'Same exact price · Buy YT';
+          note=p.offer.amount<BigInt(m.amount)?'Remaining amount below original input.':'Same exact price · Buy YT';
         }
       }catch{position='Position unverified';note='Orderbook links could not be verified.';}
     }
     if(!fresh){position=snapshot?.book?`${position} · Stale`:'Position unverified';note=snapshot?.error||'Waiting for a fresh on-chain snapshot.';}
     let later='Syncing posts after marker…';
     if(history?.complete){
-      const comparisons=(history.events||[]).map(e=>compareOrderEvent(e,m));
+      const comparisons=(history.events||[]).filter(e=>e.id>0).map(e=>compareOrderEvent(e,m));
       later=comparisons.some(x=>x===null)?'Later posts: order unverified':`${comparisons.filter(x=>x>0).length} decoded Post Offers after marker · same market`;
     }
     cards.push(`<article class="order-marker"><header><strong>${esc(label)} · Order #${m.id}</strong><span title="Raw price: ${m.price}">${(Math.expm1(m.price/1e6)*100).toFixed(8)}% APY</span><button type="button" data-remove-marker="${esc(orderKey(m))}">Unmark</button></header><p>${market?esc(apyDate(market.maturityDateUnixTs*1000))+' · ':''}<a class="sig-link" target="_blank" rel="noopener noreferrer" href="https://solscan.io/tx/${esc(m.signature)}">${esc(sh(m.signature))}</a> · ${esc(sh(m.owner))}</p><p><strong>${esc(position)}</strong> · ${esc(note)}</p>${metrics}<p>${esc(later)}${history?.error?' · '+esc(history.error):''}</p><p title="YT estimates use the live price, time remaining and reference index; not a guarantee of execution or rewards.">Estimated YT before fees · Queue at this price only</p></article>`);

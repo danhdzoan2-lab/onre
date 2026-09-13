@@ -13,6 +13,12 @@ assert.equal(d.postEvents({...tx,meta:{...tx.meta,err:{failure:1}}}).length,0);
 assert.equal(d.postEvents({...tx,meta:{innerInstructions:[{index:1,instructions:[{programId:d.PROGRAM,data:'invalid0'}]}]}}).length,0);
 assert.equal(d.postEvents({...tx,meta:{innerInstructions:[{index:1,instructions:[{programId:'fake',data:payload}]}]}}).length,0);
 assert.equal(d.postEvents({...tx,meta:{innerInstructions:[{index:7,instructions:[{programId:d.PROGRAM,data:payload},{programId:d.PROGRAM,data:payload}]}]}}).length,2);
+const raw=Buffer.from(d.unbase58(payload)),fill=Buffer.alloc(44);fill.writeBigUInt64LE(123n,0);fill.writeUInt32LE(24,8);
+const partial=Buffer.concat([raw.subarray(0,165),fill,raw.subarray(165)]);partial.writeUInt32LE(1,161);
+function decodeVariant(b){return d.postEvents({...tx,meta:{innerInstructions:[{index:7,instructions:[{programId:d.PROGRAM,data:d.base58(b)}]}]}});}
+assert.equal(decodeVariant(partial)[0].fills[0].filledAmount,'123');assert.equal(decodeVariant(partial)[0].id,28);
+const fullyFilled=Buffer.concat([partial.subarray(0,157),partial.subarray(161)]);fullyFilled[156]=0;
+assert.equal(decodeVariant(fullyFilled)[0].id,null);assert.equal(decodeVariant(fullyFilled)[0].fills.length,1);
 // Synthetic account using independently specified C-layout offsets.
 const bytes=Buffer.alloc(317688);
 bytes.writeDoubleLE(0.01,16);bytes.writeDoubleLE(0.02,24);bytes[32]=6;

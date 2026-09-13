@@ -69,9 +69,10 @@
       const r=reader(bytes);r.skip(16);const owner=r.key(),book=r.key(),vault=r.key(),price=r.u32(),amount=r.u64(),side=r.u8(),virtual=r.u8(),expirySeconds=r.u32();
       // FillOrKill enum variant 0 followed by its boolean field.
       const option=r.u8(),fillOrKill=r.u8();if(option!==0||fillOrKill>1)continue;
-      const stripped=r.u64(),merged=r.u64(),out=r.u64(),some=r.u8();if(some!==1)continue;const id=r.u32(),filled=r.u32();if(filled!==0)continue;
+      const stripped=r.u64(),merged=r.u64(),out=r.u64(),some=r.u8();if(some>1)continue;const id=some?r.u32():null,filled=r.u32();if(filled>2500)continue;
+      const fills=[];for(let f=0;f<filled;f++)fills.push({filledAmount:r.u64().toString(),id:r.u32(),takenAmount:r.u64().toString(),amountBase:r.u64().toString(),takerFee:r.u64().toString(),makerFee:r.u64().toString()});
       const lastPrice=r.u32(),syIndex=r.fixed();if(r.offset!==bytes.length)continue;
-      events.push({owner,book,vault,price,amount:amount.toString(),side,virtual,expirySeconds,id,stripped:stripped.toString(),merged:merged.toString(),out:out.toString(),lastPrice,syIndex,outer:group.index,inner:i,slot:tx.slot,transactionIndex:tx.transactionIndex,ts:tx.blockTime});
+      events.push({owner,book,vault,price,amount:amount.toString(),side,virtual,expirySeconds,id,fills,stripped:stripped.toString(),merged:merged.toString(),out:out.toString(),lastPrice,syIndex,outer:group.index,inner:i,slot:tx.slot,transactionIndex:tx.transactionIndex,ts:tx.blockTime});
       } catch { /* Unsupported or truncated events must never break the feed. */ }
     }return events;
   }

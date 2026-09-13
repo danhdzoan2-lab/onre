@@ -57,6 +57,7 @@ function renderApy() {
   }
   const status = document.getElementById('apyStatus');
   status.dataset.stale = String(Boolean(apyState.error));
+  status.hidden = Boolean(apyState.checkedAt && !apyState.error);
   const checked = apyState.checkedAt ? `Updated: ${apyDate(apyState.checkedAt)}` : 'Not updated yet';
   status.textContent = apyState.error ? `${apyState.markets ? 'Stale data · ' : ''}${apyState.error} · ${checked}`
     : apyState.checkedAt ? checked : 'Loading APY…';

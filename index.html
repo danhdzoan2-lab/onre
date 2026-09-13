@@ -166,7 +166,6 @@
     .settings summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
     .settings .proxy-row { margin-top:12px; }
     .config-card > .notice-row:has(.notif-banner:not(.show)) { margin:0; }
-    .compact-refresh { color:var(--muted); font-size:.78rem; margin:8px 0 12px; }
     .limit-input-wrap { display:inline-flex; align-items:center; width:110px; height:38px; border:1px solid var(--line); border-radius:8px; background:#090d0a; overflow:hidden; }
     .limit-input-wrap:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,214,143,.12); }
     .limit-input-wrap input { width:100%; min-width:0; border:0; outline:none; background:transparent; color:var(--text); text-align:right; padding:8px 4px 8px 8px; font:inherit; font-variant-numeric:tabular-nums; }
@@ -201,10 +200,10 @@
   </header>
 
   <section class="config-card" aria-labelledby="configTitle">
-    <div>
+    <div class="monitor-contracts">
       <div class="config-title" id="configTitle">Monitor</div>
 
-      <div role="group" aria-label="Contract filter" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
+      <div role="group" aria-label="Contract filter" style="display:flex;flex-wrap:wrap;gap:8px">
         <button id="clmmContractBtn" class="filter-button" type="button" aria-pressed="true" onclick="setContract('clmm')">Exponent CLMM</button>
         <button id="orderbookContractBtn" class="filter-button" type="button" aria-pressed="false" onclick="setContract('orderbook')">Exponent Orderbook</button>
       </div>
@@ -233,15 +232,10 @@
     </div>
   </section>
 
-  <div class="compact-refresh">Live · Refresh 2s · <span id="refreshTime">Updated —</span></div>
-
   <section class="table-panel" aria-labelledby="apyTitle">
-    <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
-    <p class="apy-note">Refresh 2s · APY cache 30s</p>
+    <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><div class="apy-header-controls"><label title="Market APY − My APY ≤ Threshold"><input id="limitAlerts" type="checkbox"> APY Alarm</label><button id="testLimitAudio" type="button">Test Alarm</button></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
     <div class="apy-note">
-      <label><input id="limitAlerts" type="checkbox"> APY Alarm</label>
-      <button id="testLimitAudio" type="button">Test Alarm</button>
       <p id="limitAudioStatus" role="status"></p>
       <p id="limitStorageStatus" role="status"></p>
       <section id="limitAlarmPanel" hidden role="alert" style="position:sticky;top:8px;z-index:20;background:#382018;border:2px solid #ffad66;border-radius:12px;padding:16px;margin:12px 0">
@@ -250,10 +244,14 @@
         <p id="limitAlarmItems" style="white-space:pre-line;overflow-wrap:anywhere"></p>
         <p id="limitAlarmData"></p>
       </section>
-      <p>Market APY − My APY ≤ Threshold → alarm until stopped.</p>
     </div>
     <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
+  </section>
+  <section class="table-panel" id="orderMarkersPanel" aria-labelledby="orderMarkersTitle">
+    <div class="panel-header"><h2 class="panel-title" id="orderMarkersTitle">Marked YT Orders</h2><form id="importOrderForm" class="order-import"><input id="importOrder" aria-label="Post Offer transaction" placeholder="Post Offer signature or Solscan link" autocomplete="off"><button type="submit">Mark order</button></form></div>
+    <p id="orderStatus" class="apy-note" role="status">Mark your Post Offer to check its live queue.</p>
+    <div id="orderMarkers" class="order-markers"></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
@@ -540,8 +538,8 @@
   const selectedAssets = new Set();
   let fetchInFlight = false;
   const txCache = new Map();
-  const SIGNATURE_SCAN_LIMIT = 20;
-  const DISPLAY_LIMIT = 20;
+  const SIGNATURE_SCAN_LIMIT = 50;
+  const DISPLAY_LIMIT = 50;
   const FETCH_CONCURRENCY = 4;
   const POLL_INTERVAL_MS = 2000;
 
@@ -577,7 +575,6 @@
     document.getElementById('contractFooter').textContent = `${contract.name} ${sh(contract.address)} · all contract activity`;
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     document.getElementById('lastUpdate').textContent = 'Not yet fetched';
-    document.getElementById('refreshTime').textContent = 'Updated —';
     renderCurrentTransactions();
     updateNotifUI();
     setLoading(`Loading ${contract.name} transactions…`);
@@ -711,6 +708,7 @@
           changes,
           interaction: getProgramInstructions(tx, contract.address),
           success: !tx.meta?.err,
+          postOffers: typeof ExponentBook !== 'undefined' ? ExponentBook.postEvents(tx) : [],
           relatedAssets: Object.keys(ASSETS).filter(key => transactionTouchesMint(tx, ASSETS[key].mint)),
           isNew: !seenSigs.has(top[i].signature)
         });
@@ -740,7 +738,6 @@
       currentTxs = results;
       renderCurrentTransactions();
       document.getElementById('lastUpdate').innerText = 'Updated: ' + apyDate(Date.now());
-      document.getElementById('refreshTime').textContent = 'Updated ' + apyDate(Date.now());
     } catch(e) {
       if (revision !== contractRevision) return;
       if (!silent || !currentTxs.length) setStateMessage('Connection issue', e.message, 'error');
@@ -790,7 +787,7 @@
           </div></div>
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Interaction</div>
-            <div class="tx-card-value">${escapeHtml(tx.interaction || 'Other')}</div>
+            <div class="tx-card-value">${escapeHtml(tx.interaction || 'Other')}${typeof orderMarkButtons === 'function' ? orderMarkButtons(tx) : ''}</div>
           </div></div>
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Wallet</div>
@@ -814,7 +811,7 @@
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a></td>
         <td><span class="${statusClass}">${statusLabel}</span></td>
-        <td>${escapeHtml(tx.interaction || 'Other')}</td>
+        <td>${escapeHtml(tx.interaction || 'Other')}${typeof orderMarkButtons === 'function' ? orderMarkButtons(tx) : ''}</td>
         <td class="wallet-addr" title="${escapeHtml(tx.from)}">${escapeHtml(sh(tx.from))}</td>
         <td class="amount">${amountDisplay}</td>
         <td>${escapeHtml(ta(tx.ts))}</td>
@@ -977,7 +974,28 @@
 <script src="apy.js"></script>
 <script src="limit-monitor.js"></script>
 <script src="reward-range.js"></script>
+<script src="orderbook.js"></script>
+<script src="order-monitor.js"></script>
 <style>
+  .config-card { align-items:flex-end; }
+  .monitor-contracts .config-title { margin-bottom:12px; }
+  .config-card .notification-actions { margin:0; padding:0; }
+  .config-card .notification-actions button,.monitor-contracts button { min-height:38px; }
+  .apy-header-controls { display:flex;align-items:center;gap:10px;margin-right:auto;align-self:flex-end; }
+  .apy-header-controls label { white-space:nowrap;font-size:13px; }
+  .apy-note:empty { display:none; }
+  .order-import { display:flex;gap:8px;flex-wrap:wrap; }
+  .order-import input { min-width:240px;background:#0b0e09;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px; }
+  .order-markers { padding:0 16px 16px;display:grid;gap:12px; }
+  .order-marker { border:1px solid var(--line);border-radius:8px;padding:12px; }
+  .order-marker header { display:flex;gap:12px;align-items:center;flex-wrap:wrap; }
+  .order-marker header button { margin-left:auto; }
+  .order-marker p { margin:8px 0 0;font-size:13px; }
+  .order-metrics { display:flex;gap:20px;flex-wrap:wrap;margin-top:12px; }
+  .order-metrics span { display:grid;gap:4px;font-size:12px; }
+  .order-metrics strong { color:var(--amber);font-size:16px; }
+  .mark-order { display:inline-block;margin:4px 0 0 8px;padding:5px 8px;font-size:11px; }
+  @media(max-width:720px) { .config-card .notification-actions { flex-direction:row; }.config-card .notification-actions button { width:auto; }.apy-header-controls { margin-right:0; }.order-import { width:100%; }.order-import input { min-width:0;flex:1; } }
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>

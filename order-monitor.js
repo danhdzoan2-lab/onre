@@ -1,6 +1,6 @@
 'use strict';
 const ORDER_STORAGE = 'exponent-order-markers-v1';
-const orderWatch = {markers:[],history:{},books:new Map(),scans:new Map(),busy:false,historyBusy:false,retryAt:0,error:'',revision:0};
+const orderWatch = {markers:[],history:{},books:new Map(),scans:new Map(),transactions:new Map(),busy:false,historyBusy:false,retryAt:0,error:'',revision:0};
 function orderKey(e){return `${e.signature}:${e.outer}:${e.inner}`;}
 function validMarker(m){return m && /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(m.signature) && m.side===2 && m.virtual===0 && Number.isInteger(m.id) && m.id>0 && Number.isInteger(m.price) && Number.isFinite(m.ts) && /^[0-9]+$/.test(m.amount);}
 function loadOrderMarkers(){
@@ -12,13 +12,17 @@ function saveOrderMarkers(){
   catch{orderWatch.error='Markers could not be saved. Keep this page open.';}
 }
 async function orderRpc(method,params){
+  const cacheKey=method==='getTransaction'?params[0]:null;
+  if(cacheKey&&orderWatch.transactions.has(cacheKey))return orderWatch.transactions.get(cacheKey);
   if(Date.now()<orderWatch.retryAt)throw Error('Orderbook rate limited; waiting to retry');
   const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);
   try{
     const response=await fetch(getProxy(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:c.signal});
     if(response.status===429){orderWatch.retryAt=Date.now()+apyRetryDelay(response.headers.get('Retry-After'));throw Error('Orderbook rate limited; waiting to retry');}
     if(!response.ok)throw Error(`Orderbook request failed (${response.status})`);
-    const j=await response.json();if(j.error){if(j.error.code===429)orderWatch.retryAt=Date.now()+30000;throw Error(j.error.message||'Orderbook RPC error');}return j.result;
+    const j=await response.json();if(j.error){if(j.error.code===429)orderWatch.retryAt=Date.now()+30000;throw Error(j.error.message||'Orderbook RPC error');}
+    if(cacheKey&&j.result){orderWatch.transactions.set(cacheKey,j.result);while(orderWatch.transactions.size>500)orderWatch.transactions.delete(orderWatch.transactions.keys().next().value);}
+    return j.result;
   }finally{clearTimeout(timer);}
 }
 function orderMarkButtons(tx){

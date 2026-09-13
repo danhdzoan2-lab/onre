@@ -1,6 +1,28 @@
 'use strict';
 const ORDER_STORAGE = 'exponent-order-markers-v1';
 const orderWatch = {markers:[],history:{},books:new Map(),scans:new Map(),transactions:new Map(),busy:false,historyBusy:false,retryAt:0,error:'',revision:0};
+const orderBookFlights = new Map();
+async function getOrderBookSnapshot(address) {
+  const proxy=getProxy(), key=`${proxy}:${address}`, previous=orderWatch.books.get(address);
+  if(previous && !previous.error && previous.proxy===proxy && Date.now()-previous.checkedAt<1800)return previous;
+  if(orderBookFlights.has(key))return orderBookFlights.get(key);
+  const flight=(async()=>{
+    try {
+      const a=await orderRpc('getAccountInfo',[address,{encoding:'base64',commitment:'confirmed'}]);
+      if(a?.value?.owner!==ExponentBook.PROGRAM)throw Error('Unexpected orderbook account owner');
+      const book=ExponentBook.decodeBook(Uint8Array.from(atob(a.value.data[0]),c=>c.charCodeAt(0)));
+      const time=await orderRpc('getBlockTime',[a.context.slot]);
+      if(!Number.isFinite(time)||Math.abs(Date.now()/1000-time)>30)throw Error('Orderbook snapshot is stale');
+      const snapshot={book,time,slot:a.context.slot,checkedAt:Date.now(),error:'',proxy};
+      if(getProxy()===proxy)orderWatch.books.set(address,snapshot);
+      return snapshot;
+    }catch(e){
+      if(getProxy()===proxy)orderWatch.books.set(address,{...orderWatch.books.get(address),error:e.name==='AbortError'?'Orderbook timed out':e.message});
+      throw e;
+    }finally{orderBookFlights.delete(key);}
+  })();
+  orderBookFlights.set(key,flight);return flight;
+}
 function orderKey(e){return `${e.signature}:${e.outer}:${e.inner}`;}
 function validMarker(m){return m && /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(m.signature) && m.side===2 && m.virtual===0 && Number.isInteger(m.id) && m.id>0 && Number.isInteger(m.price) && Number.isFinite(m.ts) && /^[0-9]+$/.test(m.amount);}
 function loadOrderMarkers(){
@@ -90,7 +112,7 @@ function renderOrderMarkers(){
       const comparisons=(history.events||[]).filter(e=>e.id>0).map(e=>compareOrderEvent(e,m));
       later=comparisons.some(x=>x===null)?'Later posts: order unverified':`${comparisons.filter(x=>x>0).length} decoded Post Offers after marker · same market`;
     }
-    cards.push(`<article class="order-marker"><header><strong>${esc(label)} · Order #${m.id}</strong><span title="Raw price: ${m.price}">${(Math.expm1(m.price/1e6)*100).toFixed(8)}% APY</span><button type="button" data-remove-marker="${esc(orderKey(m))}">Unmark</button></header><p>${market?esc(apyDate(market.maturityDateUnixTs*1000))+' · ':''}<a class="sig-link" target="_blank" rel="noopener noreferrer" href="https://solscan.io/tx/${esc(m.signature)}">${esc(sh(m.signature))}</a> · ${esc(sh(m.owner))}</p><p><strong>${esc(position)}</strong> · ${esc(note)}</p>${metrics}<p>${esc(later)}${history?.error?' · '+esc(history.error):''}</p><p title="YT estimates use the live price, time remaining and reference index; not a guarantee of execution or rewards.">Estimated YT before fees · Queue at this price only</p></article>`);
+    cards.push(`<article class="order-marker"><header><strong>${esc(label)} · Order #${m.id}</strong><span title="Raw price: ${m.price} · ${(Math.expm1(m.price/1e6)*100).toFixed(10)}%">${(Math.expm1(m.price/1e6)*100).toFixed(2)}% APY</span><button type="button" data-remove-marker="${esc(orderKey(m))}">Unmark</button></header><p>${market?esc(apyDate(market.maturityDateUnixTs*1000))+' · ':''}<a class="sig-link" target="_blank" rel="noopener noreferrer" href="https://solscan.io/tx/${esc(m.signature)}">${esc(sh(m.signature))}</a> · ${esc(sh(m.owner))}</p><p><strong>${esc(position)}</strong> · ${esc(note)}</p>${metrics}<p>${esc(later)}${history?.error?' · '+esc(history.error):''}</p><p title="YT estimates use the live price, time remaining and reference index; not a guarantee of execution or rewards.">Estimated YT before fees · Queue at this price only</p></article>`);
   }
   const html=cards.join('');if(body.innerHTML!==html)body.innerHTML=html;
   document.getElementById('orderStatus').textContent=orderWatch.error||(orderWatch.markers.length?'':'Mark your Post Offer to check its live queue.');
@@ -134,14 +156,10 @@ async function refreshOrderWatch(){
   try{
     for(const address of new Set(orderWatch.markers.map(m=>m.book))){
       try{
-        const a=await orderRpc('getAccountInfo',[address,{encoding:'base64',commitment:'confirmed'}]);
-        if(a?.value?.owner!==ExponentBook.PROGRAM)throw Error('Unexpected orderbook account owner');
-        const bytes=Uint8Array.from(atob(a.value.data[0]),c=>c.charCodeAt(0));
-        const book=ExponentBook.decodeBook(bytes),time=await orderRpc('getBlockTime',[a.context.slot]);
-        if(!Number.isFinite(time))throw Error('Snapshot block time unavailable');
-        if(a.context.slot<Math.max(...orderWatch.markers.filter(m=>m.book===address).map(m=>m.slot))||Math.abs(Date.now()/1000-time)>30)throw Error('Orderbook snapshot is stale');
+        const snapshot=await getOrderBookSnapshot(address);
+        if(snapshot.slot<Math.max(...orderWatch.markers.filter(m=>m.book===address).map(m=>m.slot)))throw Error('Orderbook snapshot predates marker');
         if(revision!==orderWatch.revision)return;
-        orderWatch.books.set(address,{book,time,slot:a.context.slot,checkedAt:Date.now(),error:''});renderOrderMarkers();
+        renderOrderMarkers();
       }catch(e){const previous=orderWatch.books.get(address)||{};orderWatch.books.set(address,{...previous,error:e.name==='AbortError'?'Orderbook timed out':e.message});}
     }
   }finally{orderWatch.busy=false;renderOrderMarkers();}

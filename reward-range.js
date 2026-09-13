@@ -36,6 +36,16 @@ function rewardPosition(band, manual) {
 function formatRewardsApy(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `${value.toFixed(2)}%` : '—';
 }
+function formatInwardRange(low, high) {
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low > high || Math.max(Math.abs(low),Math.abs(high)) > 1e10) return '—';
+  let lower = Math.ceil(low * 1000), upper = Math.floor(high * 1000);
+  // Compare back in the original units, avoiding multiplication-rounding at exact boundaries.
+  while (lower / 1000 < low) lower++;
+  while ((lower - 1) / 1000 >= low) lower--;
+  while (upper / 1000 > high) upper--;
+  while ((upper + 1) / 1000 <= high) upper++;
+  return lower > upper ? 'No valid 3-decimal value' : `${(lower / 1000).toFixed(3)}%–${(upper / 1000).toFixed(3)}%`;
+}
 function renderRewardRange(row, market, manual) {
   if (!row.rewardCell) {
     row.rewardCell = document.createElement('td');
@@ -79,8 +89,8 @@ function renderRewardRange(row, market, manual) {
     if (!entry.band) item.textContent = '—';
     else {
       const {low, high} = entry.band;
-      item.textContent = `${low.toFixed(2)}%–${high.toFixed(2)}%${stale ? ' *' : ''}`;
-      item.title = stale ? 'Stale data' : '';
+      item.textContent = formatInwardRange(low, high) + (stale ? ' *' : '');
+      item.title = `${stale ? 'Stale data · ' : ''}Rounded inward. Range may change; not confirmation of order rewards.`;
     }
     wrap.appendChild(item);
   }

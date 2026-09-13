@@ -248,6 +248,10 @@
     <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
+  <section class="table-panel" aria-labelledby="buyBookTitle">
+    <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span class="book-hint" title="Buy YT and sell PT · Estimated YT before fees · Queue at the exact price only">Estimated YT · Same-price queue</span></div>
+    <div id="buyBooks"></div>
+  </section>
   <section class="table-panel" id="orderMarkersPanel" aria-labelledby="orderMarkersTitle">
     <div class="panel-header"><h2 class="panel-title" id="orderMarkersTitle">Marked YT Orders</h2><form id="importOrderForm" class="order-import"><input id="importOrder" aria-label="Post Offer transaction" placeholder="Post Offer signature or Solscan link" autocomplete="off"><button type="submit">Mark order</button></form></div>
     <p id="orderStatus" class="apy-note" role="status">Mark your Post Offer to check its live queue.</p>
@@ -602,6 +606,7 @@
     renderCurrentTransactions();
     renderApy();
     updateNotifUI();
+    if (typeof window.renderBuyBooks === 'function') window.renderBuyBooks();
   }
 
   function initAudioContext() {
@@ -976,6 +981,21 @@
 <script src="reward-range.js"></script>
 <script src="orderbook.js"></script>
 <script src="order-monitor.js"></script>
+<script src="buy-orderbook.js"></script>
+<style>
+ .book-market{border-top:1px solid var(--line)}
+ .book-market>summary,.book-group>summary{padding:16px;cursor:pointer;line-height:1.5}
+ .book-market>summary strong{margin-right:14px}.book-hint,.book-status{font-size:13px;color:var(--muted)}
+ .book-status{padding:0 16px}.book-status:empty{display:none}
+ .book-group{margin:0 16px 10px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+ .book-group>summary{display:list-item;background:rgba(97,205,140,.045)}
+ .book-group>summary .amount{display:inline-block;min-width:105px;margin-left:8px}
+ .book-group>summary .book-hint{margin-left:16px}
+ .book-scroll{overflow:auto}.book-orders{min-width:740px;width:100%}
+ .book-orders td{white-space:nowrap}.book-orders .book-marked td{background:rgba(255,195,62,.12);border-bottom-color:var(--amber)}
+ .book-orders small{display:block;color:var(--muted);font-size:12px}.book-orders button{padding:5px 9px;min-height:30px}
+ @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 8px 8px}.book-group>summary{padding:12px}.book-group>summary .book-hint{display:block;margin-left:8px}.book-orders th,.book-orders td{padding:12px}}
+</style>
 <style>
   .config-card { align-items:flex-end; }
   .monitor-contracts .config-title { margin-bottom:12px; }

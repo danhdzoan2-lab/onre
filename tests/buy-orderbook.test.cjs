@@ -1,0 +1,38 @@
+const assert=require('node:assert/strict');
+global.ExponentBook=require('../orderbook');
+const {buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyMarkedOrder,buyGroups}=require('../buy-orderbook');
+const now=1800000000,created=now-100,expiry=now+10000;
+const market={vaultAddress:'v',orderbookAddresses:['b'],maturityDateUnixTs:now+31536000,syExchangeRate:1.02,decimals:6};
+const order={id:100,offer_idx:7,vault_address:'v',orderbook_address:'b',user_address:'wallet1',order_type:'buyYT',price_implied_apy:86177,
+ original_amount:1000000,amount_remaining:500000,is_removed:false,created_at:new Date(created*1000).toISOString(),expiry_at:new Date(expiry*1000).toISOString(),expiry_seconds:expiry-created,tx_signature:'sig'};
+const offer={id:7,side:2,virtual:0,next:3,pricePointer:1,owner:'wallet1',created,expiry,amount:500000n};
+const second={...offer,id:3,next:0,owner:'wallet2'};
+const book={vault:'v',maturity:market.maturityDateUnixTs,priceDecimals:6,prices:[{id:1,price:86177,buyHead:7,buyTail:3}],offers:new Map([[7,offer],[3,second]])};
+const snapshot={book,time:now,checkedAt:Date.now(),error:''};
+assert.equal(buyRawAmount('9007199254740992'),null);assert.equal(buyRawAmount(-1),null);assert.equal(buyRawAmount(null),null);
+assert.equal(buyRawAmount(0),0);assert.equal(buyRawAmount('123'),123);
+assert.ok(Math.abs(buyOrderApy(86177)-8.999924109751715)<1e-10);
+assert.deepEqual(buyQueuePosition(order,market,snapshot,now),{index:1,total:2});
+assert.deepEqual(buyQueuePosition({...order,offer_idx:3,user_address:'wallet2'},market,snapshot,now),{index:2,total:2});
+for(const change of [{user_address:'reused'},{created_at:new Date((created-1)*1000).toISOString()},{expiry_seconds:1},{offer_idx:99},{price_implied_apy:86178},{amount_remaining:1000000},{order_type:'sellPT'}])
+ assert.equal(buyQueuePosition({...order,...change},market,snapshot,now),null);
+assert.equal(buyQueuePosition(order,{...market,vaultAddress:'other'},snapshot,now),null);
+assert.equal(buyQueuePosition(order,market,{...snapshot,error:'offline'},now),null);
+assert.equal(buyQueuePosition(order,market,{...snapshot,checkedAt:0},now),null);
+assert.equal(buyQueuePosition(order,market,snapshot,expiry+1),null);
+second.next=7;assert.equal(buyQueuePosition(order,market,snapshot,now),null);second.next=0;
+second.virtual=1;assert.deepEqual(buyQueuePosition({...order,offer_idx:3,user_address:'wallet2',order_type:'sellPT'},market,snapshot,now),{index:2,total:2});second.virtual=0;
+assert.equal(buyYtEstimate({...order,order_type:'sellPT'},market,now),0.5);
+assert.ok(Math.abs(buyYtEstimate(order,market,now)-0.5*1.02/(1-Math.exp(-0.086177)))<1e-9);
+assert.equal(buyYtEstimate(order,{...market,syExchangeRate:null},now),null);
+assert.equal(buyYtEstimate(order,market,market.maturityDateUnixTs+1),null);
+for(const change of [{is_removed:true},{amount_remaining:0},{expiry_at:new Date(now*1000).toISOString()},{order_type:'sellYT'},{order_type:'buyPT'},{vault_address:'other'},{orderbook_address:'other'}])
+ assert.equal(buyOpenOrders([{...order,...change}],market,now).length,0);
+const marker={signature:'sig',book:'b',vault:'v',id:7,owner:'wallet1',price:86177,ts:created,expirySeconds:expiry-created};
+assert.equal(buyMarkedOrder(order,[marker]),marker);assert.equal(buyMarkedOrder({...order,tx_signature:'reused'},[marker]),undefined);
+const groups=buyGroups([{...order,offer_idx:3,user_address:'wallet2'},order,{...order,id:101,offer_idx:8,price_implied_apy:86178}],market,new Map([['b',snapshot]]),now,[marker]);
+assert.equal(groups.length,1);assert.equal(groups[0].rows.length,3);assert.equal(groups[0].apy,9);
+assert.equal(groups[0].rows[0].position,null);assert.equal(groups[0].rows[1].position.index,1);assert.equal(groups[0].rows[2].position.index,2);
+assert.equal(groups[0].rows[0].apy.toFixed(2),groups[0].rows[1].apy.toFixed(2));
+assert.equal(buyGroups([{...order,amount_remaining:'9007199254740992'}],market,new Map(),now)[0].unknown,true);
+console.log('PASS: buy-side types, YT estimates, price buckets, independent exact-price queues, partial fills, ID reuse, markers, expiry, cancellation and stale data');

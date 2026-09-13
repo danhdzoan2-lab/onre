@@ -57,3 +57,46 @@ history synchronized. Snapshot and history polling have independent overlap guar
 mutation is implemented; existing APY alarms remain unchanged.
 
 Run regression checks: `node --test tests/*.cjs`.
+
+## Buy Orderbook (14 Sep 2026)
+
+The collapsed-by-default market view uses `/api/open-orders/vault/{vaultAddress}`.
+It follows the same mint filter and farthest-active-maturity selection as APY.
+Farm bids include `buyYT` and virtual `sellPT`. Each order's raw log rate is
+converted with `100 * expm1(raw / 1e6)` and displayed to two decimals. Display
+buckets are nearest 0.1 percentage point; FIFO always uses the original raw rate
+and the specific book, never the bucket or rounded APY.
+
+The public Farm UI quantity conversion uses remaining SY * market.syExchangeRate
+divided by `1 - exp(-raw / 1e6 * secondsRemaining / 31536000)` for buyYT, and
+remaining amount directly for sellPT, then scales by market.decimals. Remaining
+time is rounded to the nearest minute, as in Exponent's UI. Each range group sums
+individual conversions, not a conversion at the bucket price. Unknown or unsafe
+integer amounts yield a dash, including in the group total. This display estimate
+is before fees and differs from the SDK-based marked-order estimate documented
+above when exchange-rate references or sampling times differ.
+
+Queue verification requires API/on-chain vault, book maturity, offer index,
+owner, raw price, side/virtual flag, creation/expiry, and remaining amount to match.
+IDs alone never identify an order. Confirmed linked-list snapshots are shared
+with marked-order monitoring, deduplicated per book and polled only for open,
+selected markets (unless that book also has an independently tracked marker).
+All requests time out after eight seconds; API/RPC 429 responses use Retry-After.
+Closed or filtered markets do not start new detail requests. Stale snapshots keep
+their estimates, but no current FIFO position is claimed.
+
+Live srONyc validation found an important conservative fallback: some API
+created_at values differ from on-chain creation by one second, and API expiry
+can extend past book maturity while the actual offer is capped at maturity.
+These rows remain Unverified rather than relaxing identity matching. At slot
+446764257, offers 5 and 28 at raw 86177 verified as 1/2 and 2/2 respectively;
+offer 24 at raw 85810 verified as 2/2. API-indexed offers 30, 29 and 34 had
+placement-time discrepancies and correctly remained Unverified. UI buy groups
+matched Exponent's 9.00, 8.90, 8.00 and 7.30 percent buckets. Totals drift with
+the time-to-maturity reference even without order changes.
+
+APY Range formatting is display-only: ceil the lower original bound to 0.001
+percentage point and floor the upper, checking inclusion back in original units
+to avoid floating multiplication boundary errors. Disjoint campaigns stay
+separate; an empty representable interval says No valid 3-decimal value.
+Inputs, stored settings and the signed APY alarm calculation are unchanged.

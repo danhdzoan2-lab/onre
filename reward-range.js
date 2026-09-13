@@ -33,6 +33,9 @@ function rewardPosition(band, manual) {
   if (value > band.high) return 'Above range';
   return 'Within range';
 }
+function formatRewardsApy(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `${value.toFixed(2)}%` : '—';
+}
 function renderRewardRange(row, market, manual) {
   if (!row.rewardCell) {
     row.rewardCell = document.createElement('td');
@@ -40,18 +43,34 @@ function renderRewardRange(row, market, manual) {
     row.rewardCell.className = 'amount';
     row.insertBefore(row.rewardCell, row.limitGap);
   }
+  if (!row.rewardsApyCell) {
+    row.rewardsApyCell = document.createElement('td');
+    row.rewardsApyCell.dataset.label = 'Est. Rewards APY';
+    row.rewardsApyCell.className = 'amount';
+    row.insertBefore(row.rewardsApyCell, row.limitGap);
+  }
   const state = rewardRangeState;
   const stale = !!state.error || !state.checkedAt || Date.now() - state.checkedAt > 10000 || !!apyState.error;
   const candidates = state.campaigns && rewardCandidates(state.campaigns, market, Date.now());
   const entries = candidates?.map(c => {
     const band = rewardBand(c);
     const complete = Number.isFinite(Date.parse(c.startsAt)) && Number.isFinite(Date.parse(c.endsAt)) && rewardBudget(c) === true;
-    return { id: c.id, band: complete ? band : null };
+    return { id: c.id, band: complete ? band : null, rewardsApy: complete ? formatRewardsApy(c.currentRewardsApy) : '—' };
   });
   const model = JSON.stringify({ entries, stale, manual });
   if (row.rewardCell.dataset.model === model) return;
   row.rewardCell.dataset.model = model;
   row.rewardCell.replaceChildren();
+  row.rewardsApyCell.replaceChildren();
+  const rewardsWrap = document.createElement('div');
+  if (!entries?.length) rewardsWrap.textContent = '—';
+  else for (const entry of entries) {
+    const item = document.createElement('div');
+    item.textContent = entry.rewardsApy + (stale && entry.rewardsApy !== '—' ? ' *' : '');
+    item.title = stale && entry.rewardsApy !== '—' ? 'Stale data' : '';
+    rewardsWrap.appendChild(item);
+  }
+  row.rewardsApyCell.appendChild(rewardsWrap);
   const wrap = document.createElement('div');
   if (!entries || (!entries.length && stale)) wrap.textContent = '—';
   else if (!entries.length) wrap.textContent = '—';

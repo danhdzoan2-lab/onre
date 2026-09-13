@@ -3,7 +3,16 @@ const limitState = { records: {}, edges: new Map(), enabled: false, storageError
 const LIMIT_STORAGE = 'exponent-limit-monitor-v2';
 let limitAudio = null;
 const limitAlarm = { entries: new Map(), source: null, generation: 0 };
+function renderLimitAlarmRow(row) {
+  // Stable attribute keeps the CSS animation running across refreshes.
+  const active = Boolean(row.limitKey && limitAlarm.entries.has(row.limitKey));
+  row.dataset.alarm = active ? 'true' : 'false';
+}
 function renderLimitAlarm() {
+  for (const key of Object.keys(ASSETS)) {
+    const row = document.getElementById(`apy-${key}`);
+    if (row) renderLimitAlarmRow(row);
+  }
   const panel = document.getElementById('limitAlarmPanel');
   if (!panel) return;
   panel.hidden = limitAlarm.entries.size === 0;
@@ -155,6 +164,7 @@ function renderLimitCells(row, assetKey, market) {
     row.limitInputs[0].value = typeof record.apy === 'string' ? record.apy : '';
     row.limitInputs[1].value = typeof record.threshold === 'string' ? record.threshold : '';
   }
+  renderLimitAlarmRow(row);
   row.limitInputs.forEach((input, index) => {
     input.disabled = !key;
     const invalid = input.value !== '' && limitNumber(input.value) === null;

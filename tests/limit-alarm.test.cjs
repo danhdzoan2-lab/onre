@@ -7,6 +7,10 @@ farthestApyMarket:(ms,mint)=>ms.find(m=>m.mint===mint),Notification:Object.assig
 audio:{state:'running',sampleRate:1000,destination:{},createBuffer:(c,n)=>({getChannelData:()=>new Float32Array(n)}),createBufferSource:()=>({connect(){},disconnect(){},start(){starts++;},stop(){stops++;}})}});
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../limit-monitor.js'),'utf8'),ctx);
 const run=s=>vm.runInContext(s,ctx);
+const alarmRow={dataset:{},limitKey:JSON.stringify(['a',9999999999])};
+elements.set('apy-a',alarmRow);
+const quietRow={dataset:{},limitKey:JSON.stringify(['c',9999999999])};
+ctx.ASSETS.c={label:'C',mint:'c'};elements.set('apy-c',quietRow);
 run(`limitAudio=audio;limitState.enabled=true;
 apyState.markets=['a','b'].map(mint=>({mint,vaultAddress:mint,maturityDateUnixTs:9999999999,impliedApy:.1}));
 for(const m of apyState.markets)limitState.records[limitKey(m)]={apy:'10',threshold:'0.1'};
@@ -14,12 +18,20 @@ evaluateLimitAlerts();evaluateLimitAlerts();`);
 assert.equal(starts,1);assert.equal(notices,1);assert.equal(run('limitAlarm.source.loop'),true);
 assert.equal(run('limitAlarm.source.buffer.getChannelData(0).length'),880);
 assert.equal(run('limitAlarm.entries.size'),2);
+assert.equal(alarmRow.dataset.alarm,'true');
+assert.equal(quietRow.dataset.alarm,'false');
 run(`apyState.markets.forEach(m=>m.impliedApy=.2);evaluateLimitAlerts();apyState.error='offline';renderLimitAlarm();`);
 assert.equal(stops,0);assert.match(elements.get('limitAlarmData').textContent,/offline/);
+assert.equal(alarmRow.dataset.alarm,'true');
 run(`selectedAssets.add('other');renderLimitAlarm();`);assert.equal(stops,0);
 run(`stopLimitAlarm();`);assert.equal(stops,1);assert.equal(elements.get('limitAlarmPanel').hidden,true);
+assert.equal(alarmRow.dataset.alarm,'false');
 run(`apyState.error='';selectedAssets.clear();apyState.markets.forEach(m=>m.impliedApy=.1);evaluateLimitAlerts();`);
 assert.equal(starts,2); // Above then at/below re-arms.
+assert.equal(alarmRow.dataset.alarm,'true');
+alarmRow.limitKey=JSON.stringify(['a',10000000000]);run('renderLimitAlarm()');
+assert.equal(alarmRow.dataset.alarm,'false'); // A new maturity never inherits the old row alarm.
+alarmRow.limitKey=JSON.stringify(['a',9999999999]);
 run(`stopLimitAlarm();evaluateLimitAlerts();`);assert.equal(starts,2); // Still triggered stays acknowledged.
 run(`limitState.edges.clear();evaluateLimitAlerts();`);assert.equal(starts,3); // Explicit settings reset.
 run(`limitState.enabled=false;stopLimitAlarm();`);assert.equal(stops,3);assert.equal(run('limitAlarm.entries.size'),0);

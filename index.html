@@ -173,6 +173,16 @@
     .limit-input-wrap span { padding:0 8px 0 3px; font-size:.75rem; color:var(--muted); }
     .apy-table small { display:block; max-width:150px; font-size:.7rem; }
     .apy-table small:empty { display:none; }
+    @keyframes apy-alarm-pulse {
+      0%, 100% { background-color:#291b14; }
+      50% { background-color:#65301f; }
+    }
+    .apy-table tr[data-alarm="true"] { animation:apy-alarm-pulse 1.6s ease-in-out infinite; }
+    .apy-table tr[data-alarm="true"] > td { background:transparent; border-bottom-color:#af653c; }
+    .apy-table tr[data-alarm="true"] > td:first-child { box-shadow:inset 3px 0 #ffad66; }
+    @media(prefers-reduced-motion:reduce) {
+      .apy-table tr[data-alarm="true"] { animation:none; background-color:#65301f; }
+    }
     #limitAudioStatus:empty,#limitStorageStatus:empty { display:none; }
     @media(max-width:720px) { .settings .proxy-row { display:flex; flex-direction:column; align-items:stretch; } .notification-actions { flex-wrap:wrap; } }
   </style>

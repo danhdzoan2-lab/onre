@@ -41,13 +41,13 @@ function renderRewardRange(row, market, manual) {
     row.rewardCell = document.createElement('td');
     row.rewardCell.dataset.label = 'APY Range';
     row.rewardCell.className = 'amount';
-    row.insertBefore(row.rewardCell, row.limitGap);
+    row.insertBefore(row.rewardCell, row.apyCells ? row.apyCells[3] : row.limitGap);
   }
   if (!row.rewardsApyCell) {
     row.rewardsApyCell = document.createElement('td');
-    row.rewardsApyCell.dataset.label = 'Est. Rewards APY';
+    row.rewardsApyCell.dataset.label = 'Est. Reward APY';
     row.rewardsApyCell.className = 'amount';
-    row.insertBefore(row.rewardsApyCell, row.limitGap);
+    row.insertBefore(row.rewardsApyCell, row.rewardCell);
   }
   const state = rewardRangeState;
   const stale = !!state.error || !state.checkedAt || Date.now() - state.checkedAt > 10000 || !!apyState.error;

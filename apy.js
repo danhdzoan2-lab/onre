@@ -42,6 +42,7 @@ function renderApy() {
         row.appendChild(cell);
       }
       row.lastElementChild.className = 'amount';
+      row.apyCells = Array.from(row.children);
       body.appendChild(row);
     }
     row.hidden = selectedAssets.size > 0 && !selectedAssets.has(key);
@@ -51,7 +52,7 @@ function renderApy() {
       : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
     const values = [asset.label, market ? apyDate(market.maturityDateUnixTs * 1000)
       : apyState.markets ? 'No active maturity' : '—', market ? remaining : '—', market ? formatImpliedApy(market.impliedApy) : '—'];
-    values.forEach((value, i) => { if (row.children[i].textContent !== value) row.children[i].textContent = value; });
+    values.forEach((value, i) => { if (row.apyCells[i].textContent !== value) row.apyCells[i].textContent = value; });
     if (typeof renderLimitCells === 'function') renderLimitCells(row, key, market);
   }
   const status = document.getElementById('apyStatus');

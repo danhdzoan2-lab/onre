@@ -8,7 +8,7 @@ ctx.row=el();ctx.row.limitGap=el();ctx.row.appendChild(ctx.row.limitGap);
 run(`const m={vaultAddress:'v',orderbookAddresses:['b']};const c={id:'a',vaultAddress:'v',orderbookAddress:'b',campaignType:'orderbook_quote',incentivizedOrderTypes:['buyYT'],startsAt:new Date(Date.now()-1000).toISOString(),endsAt:new Date(Date.now()+100000).toISOString(),fundingAmountRaw:'10',distributedRaw:'1',marketImpliedApy:null,priceBandBps:420,currentRewardsApy:148.629957};rewardRangeState.campaigns=[c];rewardRangeState.checkedAt=Date.now();renderRewardRange(row,m,'10');`);
 const text=()=>ctx.row.rewardsApyCell.children[0].children.map(e=>e.textContent);
 assert.deepEqual(text(),['148.63%']); // Valid APY independent of missing band input.
-assert.equal(ctx.row.children.indexOf(ctx.row.rewardsApyCell),ctx.row.children.indexOf(ctx.row.rewardCell)+1);
+assert.equal(ctx.row.children.indexOf(ctx.row.rewardsApyCell)+1,ctx.row.children.indexOf(ctx.row.rewardCell));
 const cell=ctx.row.rewardsApyCell;
 run(`c.currentRewardsApy=150;renderRewardRange(row,m,'10')`);assert.deepEqual(text(),['150.00%']);assert.equal(ctx.row.rewardsApyCell,cell);
 run(`rewardRangeState.campaigns=[{...c,id:'z',currentRewardsApy:0},c];renderRewardRange(row,m,'10')`);assert.deepEqual(text(),['150.00%','0.00%']);

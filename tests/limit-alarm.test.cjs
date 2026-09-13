@@ -15,7 +15,7 @@ assert.equal(starts,1);assert.equal(notices,1);assert.equal(run('limitAlarm.sour
 assert.equal(run('limitAlarm.source.buffer.getChannelData(0).length'),880);
 assert.equal(run('limitAlarm.entries.size'),2);
 run(`apyState.markets.forEach(m=>m.impliedApy=.2);evaluateLimitAlerts();apyState.error='offline';renderLimitAlarm();`);
-assert.equal(stops,0);assert.match(elements.get('limitAlarmData').textContent,/mất kết nối/);
+assert.equal(stops,0);assert.match(elements.get('limitAlarmData').textContent,/offline/);
 run(`selectedAssets.add('other');renderLimitAlarm();`);assert.equal(stops,0);
 run(`stopLimitAlarm();`);assert.equal(stops,1);assert.equal(elements.get('limitAlarmPanel').hidden,true);
 run(`apyState.error='';selectedAssets.clear();apyState.markets.forEach(m=>m.impliedApy=.1);evaluateLimitAlerts();`);
@@ -24,6 +24,6 @@ run(`stopLimitAlarm();evaluateLimitAlerts();`);assert.equal(starts,2); // Still 
 run(`limitState.edges.clear();evaluateLimitAlerts();`);assert.equal(starts,3); // Explicit settings reset.
 run(`limitState.enabled=false;stopLimitAlarm();`);assert.equal(stops,3);assert.equal(run('limitAlarm.entries.size'),0);
 run(`limitAlarm.entries.set('blocked','test');audio.state='suspended';startLimitAlarmAudio();`);assert.equal(starts,3);
-assert.match(elements.get('limitAudioStatus').textContent,/mở khóa/);
+assert.match(elements.get('limitAudioStatus').textContent,/locked/);
 run(`stopLimitAlarm();audio.state='running';startLimitAlarmAudio();`);assert.equal(starts,3);
 console.log('PASS: single 2s audio loop, grouped markets, latched recovery/errors, immediate stop, rearm, wallet switch, blocked sound');

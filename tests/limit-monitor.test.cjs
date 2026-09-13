@@ -53,7 +53,7 @@ for (const [m, manual, threshold, expected] of [[10.1,10,.1,true],[9.9,10,.1,tru
   assert.equal(run(`limitGapAtOrBelow(${m},${manual},${threshold})`), expected);
 }
 run(`row.limitInputs[1].value='-0.1'; row.limitInputs[1].input(); renderLimitCells(row,'onyc',market);`);
-assert.match(ctx.row.limitInputs[1].limitError.textContent, /không âm/);
+assert.match(ctx.row.limitInputs[1].limitError.textContent, /nonnegative/);
 run(`evaluateLimitAlerts()`);
 assert.equal(notices, 4);
 // One sound + notification for two markets; denied notifications do not mute sound.
@@ -97,7 +97,7 @@ run(`startLimitAlarmAudio=()=>{};`); // Unlock tests below exercise only the one
   ctx.fakeAudio.state='suspended';
   ctx.fakeAudio.resume=async()=>{throw new Error('blocked');};
   assert.equal(await run('unlockLimitAudio()'),false);
-  assert.match(elements.get('limitAudioStatus').textContent,/âm thanh/);
+  assert.match(elements.get('limitAudioStatus').textContent,/audio/i);
   run('playLimitApyAlert()');
   assert.equal(tones.length,12);
   console.log('PASS: audio unlock and blocked playback guidance');

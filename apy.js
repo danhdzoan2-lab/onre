@@ -24,7 +24,7 @@ function apyRetryDelay(header, now = Date.now()) {
 }
 
 function apyDate(ms) {
-  return new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Saigon', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(ms).toLocaleString('en-GB', { timeZone: 'Asia/Saigon', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).replace('Sept', 'Sep');
 }
 
 function renderApy() {
@@ -36,7 +36,7 @@ function renderApy() {
     if (!row) {
       row = document.createElement('tr');
       row.id = `apy-${key}`;
-      for (const label of ['Token', 'Ngày đáo hạn', 'Thời gian còn lại', 'Implied APY']) {
+      for (const label of ['Token', 'Maturity', 'Time Left', 'Implied APY']) {
         const cell = document.createElement('td');
         cell.dataset.label = label;
         row.appendChild(cell);
@@ -47,18 +47,18 @@ function renderApy() {
     row.hidden = selectedAssets.size > 0 && !selectedAssets.has(key);
     const market = farthestApyMarket(apyState.markets || [], asset.mint, now / 1000);
     const minutes = market ? Math.max(1, Math.ceil((market.maturityDateUnixTs * 1000 - now) / 60000)) : 0;
-    const remaining = minutes >= 1440 ? `${Math.floor(minutes / 1440)} ngày ${Math.floor(minutes % 1440 / 60)} giờ`
-      : `${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`;
+    const remaining = minutes >= 1440 ? `${Math.floor(minutes / 1440)}d ${Math.floor(minutes % 1440 / 60)}h`
+      : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
     const values = [asset.label, market ? apyDate(market.maturityDateUnixTs * 1000)
-      : apyState.markets ? 'Chưa có market còn hạn' : '—', market ? remaining : '—', market ? formatImpliedApy(market.impliedApy) : '—'];
+      : apyState.markets ? 'No active maturity' : '—', market ? remaining : '—', market ? formatImpliedApy(market.impliedApy) : '—'];
     values.forEach((value, i) => { if (row.children[i].textContent !== value) row.children[i].textContent = value; });
     if (typeof renderLimitCells === 'function') renderLimitCells(row, key, market);
   }
   const status = document.getElementById('apyStatus');
   status.dataset.stale = String(Boolean(apyState.error));
-  const checked = apyState.checkedAt ? `Lần kiểm tra thành công gần nhất: ${apyDate(apyState.checkedAt)}` : 'Chưa kiểm tra thành công';
-  status.textContent = apyState.error ? `${apyState.markets ? 'Dữ liệu cũ · ' : ''}${apyState.error} · ${checked}`
-    : apyState.checkedAt ? checked : 'Đang tải APY…';
+  const checked = apyState.checkedAt ? `Updated: ${apyDate(apyState.checkedAt)}` : 'Not updated yet';
+  status.textContent = apyState.error ? `${apyState.markets ? 'Stale data · ' : ''}${apyState.error} · ${checked}`
+    : apyState.checkedAt ? checked : 'Loading APY…';
 }
 
 async function fetchApy() {
@@ -70,18 +70,18 @@ async function fetchApy() {
     const response = await fetch(APY_ENDPOINT, { signal: controller.signal });
     if (response.status === 429) {
       apyState.retryAt = Date.now() + apyRetryDelay(response.headers.get('Retry-After'));
-      throw new Error('Nguồn giới hạn truy cập, đang chờ thử lại');
+      throw new Error('Rate limited; waiting to retry');
     }
-    if (!response.ok) throw new Error(`Không tải được APY (${response.status})`);
+    if (!response.ok) throw new Error(`Unable to load APY (${response.status})`);
     const markets = await response.json();
-    if (!Array.isArray(markets) || markets.some(m => !m || typeof m !== 'object' || Array.isArray(m))) throw new Error('Dữ liệu APY không hợp lệ');
+    if (!Array.isArray(markets) || markets.some(m => !m || typeof m !== 'object' || Array.isArray(m))) throw new Error('Invalid APY data');
     apyState.markets = markets;
     apyState.checkedAt = Date.now();
     apyState.error = '';
     apyState.retryAt = 0;
     if (typeof evaluateLimitAlerts === 'function') evaluateLimitAlerts();
   } catch (error) {
-    apyState.error = error.name === 'AbortError' ? 'Nguồn APY phản hồi quá chậm' : error.message || 'Không tải được APY';
+    apyState.error = error.name === 'AbortError' ? 'APY request timed out' : error.message || 'Unable to load APY';
   } finally {
     clearTimeout(timeout);
     apyState.inFlight = false;

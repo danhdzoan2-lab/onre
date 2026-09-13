@@ -26,17 +26,17 @@ function rewardCandidates(campaigns, market, now) {
     }).sort((a,b) => String(a.id).localeCompare(String(b.id)));
 }
 function rewardPosition(band, manual) {
-  if (manual == null || manual.trim() === '') return 'Chưa nhập My APY';
+  if (manual == null || manual.trim() === '') return 'Enter My APY';
   const value = limitNumber(manual);
-  if (value === null) return 'My APY không hợp lệ';
-  if (value < band.low) return 'Dưới range';
-  if (value > band.high) return 'Trên range';
-  return 'Trong range';
+  if (value === null) return 'Invalid My APY';
+  if (value < band.low) return 'Below range';
+  if (value > band.high) return 'Above range';
+  return 'Within range';
 }
 function renderRewardRange(row, market, manual) {
   if (!row.rewardCell) {
     row.rewardCell = document.createElement('td');
-    row.rewardCell.dataset.label = 'Implied APY range';
+    row.rewardCell.dataset.label = 'APY Range';
     row.rewardCell.className = 'amount';
     row.insertBefore(row.rewardCell, row.limitGap);
   }
@@ -61,7 +61,7 @@ function renderRewardRange(row, market, manual) {
     else {
       const {low, high} = entry.band;
       item.textContent = `${low.toFixed(2)}%–${high.toFixed(2)}%${stale ? ' *' : ''}`;
-      item.title = stale ? 'Dữ liệu cũ' : '';
+      item.title = stale ? 'Stale data' : '';
     }
     wrap.appendChild(item);
   }
@@ -76,18 +76,18 @@ async function fetchRewardRanges() {
     const response = await fetch(REWARD_RANGE_ENDPOINT, {signal: controller.signal});
     if (response.status === 429) {
       state.retryAt = Date.now() + apyRetryDelay(response.headers.get('Retry-After'));
-      throw new Error('Nguồn range giới hạn truy cập, đang chờ thử lại');
+      throw new Error('Range rate limited; waiting to retry');
     }
-    if (!response.ok) throw new Error(`Không tải được range (${response.status})`);
+    if (!response.ok) throw new Error(`Unable to load range (${response.status})`);
     const data = await response.json();
-    if (!Array.isArray(data.campaigns) || data.campaigns.some(c => !c || typeof c !== 'object' || Array.isArray(c))) throw new Error('Dữ liệu range không hợp lệ');
+    if (!Array.isArray(data.campaigns) || data.campaigns.some(c => !c || typeof c !== 'object' || Array.isArray(c))) throw new Error('Invalid range data');
     state.campaigns = data.campaigns; state.checkedAt = Date.now(); state.error = ''; state.retryAt = 0;
   } catch (error) {
-    state.error = error.name === 'AbortError' ? 'Nguồn range phản hồi quá chậm' : error.message;
+    state.error = error.name === 'AbortError' ? 'Range request timed out' : error.message;
   } finally {
     clearTimeout(timeout); state.inFlight = false;
     const status = document.getElementById('rewardRangeStatus');
-    if (status) status.textContent = `${state.error ? 'Dữ liệu range cũ / chưa xác định · ' + state.error + ' · ' : ''}Range: ${state.checkedAt ? 'Lần kiểm tra thành công gần nhất: ' + apyDate(state.checkedAt) : 'Chưa kiểm tra thành công'}`;
+    if (status) status.textContent = `${state.error ? 'Range stale / unknown · ' + state.error + ' · ' : ''}Range: ${state.checkedAt ? 'Updated: ' + apyDate(state.checkedAt) : 'Not updated yet'}`;
     renderApy();
   }
 }

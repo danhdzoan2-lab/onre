@@ -161,6 +161,20 @@
       table { min-width: 0; }
       .footer { flex-direction: column; }
     }
+    .config-card { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 18px; }
+    .settings { order:3; flex-basis:100%; }
+    .settings summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
+    .settings .proxy-row { margin-top:12px; }
+    .config-card > .notice-row:has(.notif-banner:not(.show)) { margin:0; }
+    .compact-refresh { color:var(--muted); font-size:.78rem; margin:8px 0 12px; }
+    .limit-input-wrap { display:inline-flex; align-items:center; width:110px; height:38px; border:1px solid var(--line); border-radius:8px; background:#090d0a; overflow:hidden; }
+    .limit-input-wrap:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,214,143,.12); }
+    .limit-input-wrap input { width:100%; min-width:0; border:0; outline:none; background:transparent; color:var(--text); text-align:right; padding:8px 4px 8px 8px; font:inherit; font-variant-numeric:tabular-nums; }
+    .limit-input-wrap span { padding:0 8px 0 3px; font-size:.75rem; color:var(--muted); }
+    .apy-table small { display:block; max-width:150px; font-size:.7rem; }
+    .apy-table small:empty { display:none; }
+    #limitAudioStatus:empty,#limitStorageStatus:empty { display:none; }
+    @media(max-width:720px) { .settings .proxy-row { display:flex; flex-direction:column; align-items:stretch; } .notification-actions { flex-wrap:wrap; } }
   </style>
 </head>
 <body>
@@ -178,15 +192,15 @@
 
   <section class="config-card" aria-labelledby="configTitle">
     <div>
-      <div class="config-title" id="configTitle">RPC endpoint</div>
-      <div class="config-heading">Choose a contract to monitor</div>
+      <div class="config-title" id="configTitle">Monitor</div>
+
       <div role="group" aria-label="Contract filter" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">
         <button id="clmmContractBtn" class="filter-button" type="button" aria-pressed="true" onclick="setContract('clmm')">Exponent CLMM</button>
         <button id="orderbookContractBtn" class="filter-button" type="button" aria-pressed="false" onclick="setContract('orderbook')">Exponent Orderbook</button>
       </div>
-      <p class="config-copy">Select one or more tokens to filter the feed and alerts. Transactions matching any selected token are included. Click a token again to deselect it, or All to reset.</p>
+
     </div>
-    <div class="proxy-row">
+    <details class="settings"><summary>Settings</summary><div class="proxy-row">
       <div class="field">
         <label for="proxyUrl">Worker URL</label>
         <input type="url" id="proxyUrl" value="https://wild-night-f072.amazygo1.workers.dev" autocomplete="off" spellcheck="false" />
@@ -199,7 +213,8 @@
     </div>
     <div class="notice-row">
       <div class="warn-note">Use a real browser tab for desktop alerts. Auto-refresh is 2s. <span id="volumeNote">High volume compares the largest signer token change in each transaction.</span></div>
-      <div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
+    </div></details>
+    <div class="notice-row"><div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
     <div class="notification-actions" aria-label="Notification controls">
       <button id="notifyBtn" type="button" onclick="toggleAlertMaster()">Enable alerts</button>
@@ -208,40 +223,27 @@
     </div>
   </section>
 
-  <section class="stats-grid" aria-label="Contract activity summary">
-    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-number" id="sTx" aria-live="polite">—</div><div class="stat-sub">latest contract signatures</div></div>
-    <div class="stat-card"><div class="stat-label">Instruction Types</div><div class="stat-number" id="sTot" aria-live="polite">—</div><div class="stat-sub">unique decoded actions</div></div>
-    <div class="stat-card"><div class="stat-label">Active Wallets</div><div class="stat-number" id="sWal" aria-live="polite">—</div><div class="stat-sub">unique signers</div></div>
-    <div class="stat-card"><div class="stat-label">Latest Activity</div><div class="stat-number" id="sLat" aria-live="polite">—</div><div class="stat-sub" id="sLatH"></div></div>
-  </section>
-  <section class="refresh-strip" aria-label="Auto refresh">
-    <div class="refresh-label">
-      <div class="refresh-label-top">Auto-refresh</div>
-      <div class="refresh-label-bottom">Every 2 seconds</div>
-    </div>
-    <div class="refresh-track"><div id="refreshFill" class="refresh-fill"></div></div>
-    <div id="refreshTime" class="refresh-time">Last updated --:--:--</div>
-  </section>
+  <div class="compact-refresh">Live · Refresh 2s · <span id="refreshTime">Updated —</span></div>
 
   <section class="table-panel" aria-labelledby="apyTitle">
     <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
-    <p class="apy-note">Kiểm tra 2 giây · Cache APY 30 giây</p>
-    <p class="apy-note" id="apyStatus" role="status">Đang tải APY…</p>
+    <p class="apy-note">Refresh 2s · APY cache 30s</p>
+    <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
     <div class="apy-note">
-      <label><input id="limitAlerts" type="checkbox"> Cảnh báo khoảng cách APY</label>
-      <button id="testLimitAudio" type="button">Thử âm APY</button>
+      <label><input id="limitAlerts" type="checkbox"> APY Alarm</label>
+      <button id="testLimitAudio" type="button">Test Alarm</button>
       <p id="limitAudioStatus" role="status"></p>
       <p id="limitStorageStatus" role="status"></p>
       <section id="limitAlarmPanel" hidden role="alert" style="position:sticky;top:8px;z-index:20;background:#382018;border:2px solid #ffad66;border-radius:12px;padding:16px;margin:12px 0">
-        <strong>Báo thức APY đang bật</strong>
-        <button id="stopLimitAlarm" type="button" style="background:#ffad66;color:#201007;min-height:48px;margin:8px">Dừng báo thức</button>
+        <strong>APY Alarm Active</strong>
+        <button id="stopLimitAlarm" type="button" style="background:#ffad66;color:#201007;min-height:48px;margin:8px">Stop Alarm</button>
         <p id="limitAlarmItems" style="white-space:pre-line;overflow-wrap:anywhere"></p>
         <p id="limitAlarmData"></p>
       </section>
-      <p>Market APY − My APY ≤ ngưỡng → báo thức đến khi bấm Dừng.</p>
+      <p>Market APY − My APY ≤ Threshold → alarm until stopped.</p>
     </div>
     <p id="rewardRangeStatus" hidden></p>
-    <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Ngày đáo hạn</th><th>Thời gian còn lại</th><th>Implied APY</th><th>My Limit Order APY (%)</th><th>Implied APY range</th><th>Chênh lệch (đpt)</th><th>Ngưỡng (đpt)</th></tr></thead><tbody id="apyRows"></tbody></table></div>
+    <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Implied APY</th><th>My Limit APY</th><th>APY Range</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
@@ -390,7 +392,7 @@
   }
 
   function ta(ts) { if (!ts) return '—'; const d = Math.floor(Date.now()/1000)-ts; if (d<60) return d+'s ago'; if (d<3600) return Math.floor(d/60)+'m ago'; if (d<86400) return Math.floor(d/3600)+'h ago'; return Math.floor(d/86400)+'d ago'; }
-  function fd(ts) { return ts ? new Date(ts*1000).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function fd(ts) { return ts ? apyDate(ts * 1000) : '—'; }
   function sh(s) { return s ? s.slice(0,6)+'…'+s.slice(-4) : '—'; }
   function nm(n) { return typeof n === 'number' ? n.toLocaleString(undefined,{maximumFractionDigits:2}) : '—'; }
   function escapeHtml(value) {
@@ -441,8 +443,6 @@
   function setLoading(msg) { setStateMessage('Loading transactions', msg); }
   function setEmpty(msg) {
     setStateMessage('No contract transactions', msg);
-    ['sTx','sTot','sWal','sLat'].forEach(id=>document.getElementById(id).textContent='—');
-    document.getElementById('sLatH').textContent = '';
     document.getElementById('txBadge').textContent='0 txs';
   }
   function isMobileView() { return window.matchMedia('(max-width: 760px)').matches || window.innerWidth < 760 || document.documentElement.clientWidth < 760; }
@@ -567,7 +567,7 @@
     document.getElementById('contractFooter').textContent = `${contract.name} ${sh(contract.address)} · all contract activity`;
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     document.getElementById('lastUpdate').textContent = 'Not yet fetched';
-    document.getElementById('refreshTime').textContent = 'Last updated --:--:--';
+    document.getElementById('refreshTime').textContent = 'Updated —';
     renderCurrentTransactions();
     updateNotifUI();
     setLoading(`Loading ${contract.name} transactions…`);
@@ -729,8 +729,8 @@
       seenSigs = new Set(results.map(r=>r.sig));
       currentTxs = results;
       renderCurrentTransactions();
-      document.getElementById('lastUpdate').innerText = 'Updated: ' + new Date().toLocaleTimeString();
-      document.getElementById('refreshTime').textContent = 'Last updated ' + new Date().toLocaleTimeString();
+      document.getElementById('lastUpdate').innerText = 'Updated: ' + apyDate(Date.now());
+      document.getElementById('refreshTime').textContent = 'Updated ' + apyDate(Date.now());
     } catch(e) {
       if (revision !== contractRevision) return;
       if (!silent || !currentTxs.length) setStateMessage('Connection issue', e.message, 'error');
@@ -748,21 +748,7 @@
 
   function renderTable(txs) {
     const filterCopy = getAssetFilterCopy();
-    document.getElementById('sTx').innerText = txs.length;
     document.getElementById('txBadge').innerText = `${txs.length} ${filterCopy.badge}`;
-    document.getElementById('sWal').innerText = new Set(txs.map(tx => tx.from).filter(Boolean)).size;
-    const instructionTypes = new Set(
-      txs.flatMap(tx => (tx.interaction || '').split(' · '))
-        .filter(name => name && name !== 'Contract interaction' && name !== 'Details unavailable')
-    );
-    document.getElementById('sTot').textContent = instructionTypes.size || '—';
-    if (txs[0]) {
-      document.getElementById('sLat').innerText = ta(txs[0].ts);
-      document.getElementById('sLatH').innerText = fd(txs[0].ts);
-    } else {
-      document.getElementById('sLat').innerText = '—';
-      document.getElementById('sLatH').innerText = '';
-    }
     if (!txs.length) {
       setStateMessage(
         selectedAssets.size === 0 ? 'No contract transactions' : `No ${filterCopy.empty} transactions`,
@@ -953,7 +939,7 @@
       normalBtn.classList.toggle('btn-off', !trackerNotify.normal);
       highBtn.classList.toggle('btn-high-on', trackerNotify.high);
       highBtn.classList.toggle('btn-off', !trackerNotify.high);
-      banner.style.display = 'flex';
+      banner.style.display = 'none';
       banner.innerText = `${CONTRACTS[selectedContract].name} alerts - ${trackerNotify.armed ? 'Ready' : 'Paused'} · Scope: ${getAssetFilterCopy().scope} · Normal: ${trackerNotify.normal ? 'On' : 'Off'} · High volume: ${trackerNotify.high ? 'On' : 'Off'}`;
     } else {
       notifyBtn.textContent = 'Alerts: OFF';
@@ -974,20 +960,7 @@
     }
   }
 
-  let refreshStartedAt = Date.now();
-  function tickRefreshProgress() {
-    const elapsed = Date.now() - refreshStartedAt;
-    const progress = Math.min(100, (elapsed / POLL_INTERVAL_MS) * 100);
-    const fill = document.getElementById('refreshFill');
-    if (fill) fill.style.width = `${progress}%`;
-  }
-  setInterval(() => {
-    if (getProxy()) fetchAll({ silent: true });
-    refreshStartedAt = Date.now();
-  }, POLL_INTERVAL_MS);
-  setInterval(tickRefreshProgress, 1000);
-  refreshStartedAt = Date.now();
-  tickRefreshProgress();
+  setInterval(() => { if (getProxy()) fetchAll({ silent: true }); }, POLL_INTERVAL_MS);
   window.addEventListener('resize', () => { if (currentTxs.length) renderCurrentTransactions(); });
   window.addEventListener('load', async () => { initHighVolumeThreshold(); await registerServiceWorker(); if (getProxy()) fetchAll(); updateNotifUI(); });
 </script>

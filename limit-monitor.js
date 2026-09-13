@@ -9,13 +9,13 @@ function renderLimitAlarm() {
   panel.hidden = limitAlarm.entries.size === 0;
   document.getElementById('limitAlarmItems').textContent = [...limitAlarm.entries.values()].join('\n');
   document.getElementById('limitAlarmData').textContent = apyState.error || Date.now() - apyState.checkedAt > 10000
-    ? 'Dữ liệu APY cũ / mất kết nối. Báo thức vẫn tiếp tục đến khi bấm Dừng.'
-    : 'Đã ghi nhận điều kiện cảnh báo. Âm tiếp tục kể cả khi APY hồi phục, đến khi bấm Dừng.';
+    ? 'APY data stale / offline. Press Stop Alarm to silence.'
+    : 'Alarm stays on until stopped.';
 }
 function startLimitAlarmAudio() {
   if (!limitAlarm.entries.size || limitAlarm.source) return;
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Báo thức đang chờ âm thanh. Bấm Thử âm APY để mở khóa.'); return;
+    limitAudioStatus('Audio locked. Click Test Alarm.'); return;
   }
   try {
     // Continuous high-volume-style alarm on the audio clock; no silent polling gap.
@@ -36,7 +36,7 @@ function startLimitAlarmAudio() {
     source.buffer = buffer; source.loop = true; source.connect(limitAudio.destination);
     source.start(); limitAlarm.source = source;
     limitAudioStatus('');
-  } catch { limitAudioStatus('Không phát được báo thức. Bấm Thử âm APY và kiểm tra quyền âm thanh.'); }
+  } catch { limitAudioStatus('Playback failed. Click Test Alarm and check audio permissions.'); }
 }
 function stopLimitAlarm() {
   limitAlarm.generation++;
@@ -57,26 +57,26 @@ function unlockLimitAudio() {
     if (!limitAudio) {
       limitAudio = new (window.AudioContext || window.webkitAudioContext)();
       limitAudio.onstatechange = () => {
-        if (limitAudio.state !== 'running' && limitAlarm.entries.size) limitAudioStatus('Báo thức bị trình duyệt đình chỉ. Bấm Thử âm APY để tiếp tục.');
+        if (limitAudio.state !== 'running' && limitAlarm.entries.size) limitAudioStatus('Audio suspended. Click Test Alarm to resume.');
       };
     }
     const generation = limitAlarm.generation;
     const resumed = limitAudio.resume();
-    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Nếu chưa nghe được âm, bấm Thử âm APY và cho phép âm thanh cho trang.');
+    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Click Test Alarm and allow site audio if needed.');
     return Promise.resolve(resumed).then(() => {
       const ready = limitAudio.state === 'running';
-      limitAudioStatus(ready ? '' : 'Trình duyệt chặn âm thanh. Bấm Thử âm APY hoặc cho phép âm thanh cho trang.');
+      limitAudioStatus(ready ? '' : 'Audio blocked. Click Test Alarm or allow site audio.');
       if (ready && generation === limitAlarm.generation) startLimitAlarmAudio();
       return ready;
-    }).catch(() => { limitAudioStatus('Không mở được âm thanh. Bấm Thử âm APY và kiểm tra quyền âm thanh.'); return false; });
+    }).catch(() => { limitAudioStatus('Cannot unlock audio. Click Test Alarm and check permissions.'); return false; });
   } catch {
-    limitAudioStatus('Trình duyệt chưa hỗ trợ hoặc đang chặn âm thanh APY.');
+    limitAudioStatus('Audio unsupported or blocked.');
     return Promise.resolve(false);
   }
 }
 function playLimitApyAlert() {
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Âm APY chưa sẵn sàng. Bấm Thử âm APY để mở khóa âm thanh.'); return;
+    limitAudioStatus('Audio not ready. Click Test Alarm.'); return;
   }
   try {
     [220, 660, 880, 660].forEach((frequency, i) => {
@@ -92,7 +92,7 @@ function playLimitApyAlert() {
       oscillator.start(start); oscillator.stop(start + 0.22);
     });
     limitAudioStatus('');
-  } catch { limitAudioStatus('Không phát được âm APY. Bấm Thử âm APY để thử lại.'); }
+  } catch { limitAudioStatus('Audio failed. Click Test Alarm to retry.'); }
 }
 function limitGapAtOrBelow(marketPercent, manualPercent, threshold) {
   // Tolerance only removes floating-point subtraction noise at an equal boundary.
@@ -115,18 +115,18 @@ function saveLimits() {
   } catch { limitState.storageError = true; }
   const status = document.getElementById('limitStorageStatus');
   if (status) status.textContent = limitState.storageError
-    ? 'Không lưu được trên trình duyệt; thiết lập chỉ giữ trong phiên này.'
+    ? 'Storage unavailable. Settings kept for this session only.'
     : '';
 }
 function renderLimitCells(row, assetKey, market) {
   if (!row.limitInputs) {
-    const cells = ['My Limit Order APY (%)', 'Chênh lệch (đpt)', 'Ngưỡng (đpt)'].map(label => {
+    const cells = ['My Limit APY', 'Gap', 'Threshold'].map(label => {
       const td = document.createElement('td'); td.dataset.label = label; row.appendChild(td); return td;
     });
     const inputs = ['apy', 'threshold'].map((field, index) => {
       const input = document.createElement('input');
-      input.type = 'text'; input.inputMode = 'decimal'; input.placeholder = '—'; input.style.width = '95px';
-      input.setAttribute('aria-label', `${ASSETS[assetKey].label} ${field === 'apy' ? 'My Limit Order APY (%)' : 'Ngưỡng (đpt)'}`);
+      input.type = 'text'; input.inputMode = 'decimal'; input.placeholder = '—';
+      input.setAttribute('aria-label', `${ASSETS[assetKey].label} ${field === 'apy' ? 'My Limit APY' : 'Threshold'}`);
       input.addEventListener('input', () => {
         if (!row.limitKey) return;
         const record = limitState.records[row.limitKey] || {};
@@ -141,7 +141,10 @@ function renderLimitCells(row, assetKey, market) {
       error.style.color = '#ffb4a8';
       input.setAttribute('aria-describedby', error.id);
       input.limitError = error;
-      cell.appendChild(input); cell.appendChild(error); return input;
+      const wrap = document.createElement('div'), unit = document.createElement('span');
+      wrap.className = 'limit-input-wrap'; unit.textContent = field === 'apy' ? '%' : 'pp';
+      wrap.appendChild(input); wrap.appendChild(unit);
+      cell.appendChild(wrap); cell.appendChild(error); return input;
     });
     row.limitInputs = inputs; row.limitGap = cells[1];
   }
@@ -156,12 +159,12 @@ function renderLimitCells(row, assetKey, market) {
     input.disabled = !key;
     const invalid = input.value !== '' && limitNumber(input.value) === null;
     input.setAttribute('aria-invalid', String(invalid));
-    input.limitError.textContent = invalid ? `${index ? 'Ngưỡng' : 'APY'} phải là số không âm (ví dụ 0.10); cảnh báo market này đang tắt.` : '';
+    input.limitError.textContent = invalid ? `${index ? 'Threshold' : 'APY'} must be nonnegative (e.g. 0.10). Alarm disabled.` : '';
   });
   const apy = limitNumber(record.apy);
   const gap = market && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100) && apy !== null
     ? market.impliedApy * 100 - apy : null;
-  row.limitGap.textContent = gap === null ? '—' : `${gap >= 0 ? '+' : ''}${gap.toFixed(2)}${apyState.error ? ' (dữ liệu cũ)' : ''}`;
+  row.limitGap.textContent = gap === null ? '—' : `${gap >= 0 ? '+' : ''}${gap.toFixed(2)}${apyState.error ? ' (stale)' : ''}`;
   if (typeof renderRewardRange === 'function') renderRewardRange(row, market, record.apy);
 }
 function evaluateLimitAlerts() {
@@ -180,7 +183,7 @@ function evaluateLimitAlerts() {
     const previous = limitState.edges.get(key);
     limitState.edges.set(key, triggered);
     if (previous === true || !triggered || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
-    const message = `${asset.label}: chênh lệch ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} đpt; ngưỡng ${threshold} đpt. Kỳ hạn ${apyDate(market.maturityDateUnixTs * 1000)}.`;
+    const message = `${asset.label}: gap ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} pp; threshold ${threshold} pp. Maturity ${apyDate(market.maturityDateUnixTs * 1000)}.`;
     if (!limitAlarm.entries.has(key)) {
       limitAlarm.entries.set(key, message);
       messages.push(message);
@@ -192,7 +195,7 @@ function evaluateLimitAlerts() {
     renderLimitAlarm();
     // Synchronous notification creation: no delayed callback can alert for a previous wallet.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try { new Notification('Chênh lệch APY ≤ ngưỡng', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
+      try { new Notification('APY Gap ≤ threshold', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
     }
   }
 }

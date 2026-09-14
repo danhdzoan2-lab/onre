@@ -78,14 +78,13 @@ if(typeof window!=='undefined'){
       if(node.summary.innerHTML!==summary)node.summary.innerHTML=summary;
       node.summary.title=stale?'Stale data':'0.1 percentage-point group · Estimated YT before fees';
       const rows=g.rows.map(({order:o,apy,yt,position},rowIndex)=>{
-        const verified=!stale&&position;
         const priceTitle=`Raw price: ${o.price_implied_apy} · ${apy===null?'Unknown APY':apy.toFixed(10)+'%'} · Book: ${o.orderbook_address}`;
         const watch=typeof orderWatchButton==='function'?orderWatchButton(o,view.dataMarket||view.market,view.assetKey,stale):'';
         const attrs=typeof orderWatchRowAttributes==='function'?orderWatchRowAttributes(o,view.dataMarket||view.market,view.assetKey):'';
         if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{index:rowIndex+1,total:g.rows.length,apy:g.apy,stale,checkedAt:view.checkedAt});
-        return `<tr ${attrs}><td title="Display position in this APY group; not verified execution priority">${rowIndex+1} / ${g.rows.length}${stale?' *':''}</td><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small> ${watch}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="At the exact raw price in this Orderbook; not the whole APY group">${verified?`${position.index} / ${position.total}`:'Unverified'}${stale?'<small>Stale</small>':''}</td></tr>`;
+        return `<tr ${attrs}><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small> ${watch}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="Display position in this APY group; not verified execution priority">${rowIndex+1} / ${g.rows.length}${stale?' *':''}</td></tr>`;
       }).join('');
-      const html=`<table class="book-orders"><thead><tr><th>Group Position</th><th>Wallet</th><th>Order ID / Type</th><th>Order APY</th><th>Remaining YT</th><th>Same-price Queue</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Order ID / Type</th><th>Order APY</th><th>Remaining YT</th><th>Group Position</th></tr></thead><tbody>${rows}</tbody></table>`;
       if(node.scroll.innerHTML!==html){
         const focusKey=document.activeElement?.dataset?.orderWatch;
         node.scroll.innerHTML=html;

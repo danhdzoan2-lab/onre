@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let loaded,unlocks=0,stops=0;
+const elements=new Map();
+const element=id=>{if(!elements.has(id))elements.set(id,{events:{},attributes:{},addEventListener(k,f){this.events[k]=f;},setAttribute(k,v){this.attributes[k]=v;}});return elements.get(id);};
+const ctx=vm.createContext({Date,Map,ASSETS:{},apyState:{checkedAt:Date.now()},document:{getElementById:element},window:{addEventListener(k,f){if(k==='load')loaded=f;}},localStorage:{getItem:()=>null,setItem(){}},setInterval(){},renderApy(){}});
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../limit-monitor.js'),'utf8'),ctx);
+ctx.unlock=()=>{unlocks++;};ctx.stop=()=>{stops++;};
+vm.runInContext('unlockLimitAudio=unlock;stopLimitAlarm=stop;',ctx);loaded();
+const button=element('limitAlerts');button.events.click();
+assert.equal(button.textContent,'APY Alarm: ON');assert.equal(button.attributes['aria-pressed'],'true');assert.equal(unlocks,1);
+button.events.click();assert.equal(button.textContent,'APY Alarm: OFF');assert.equal(button.attributes['aria-pressed'],'false');assert.equal(stops,1);
+assert.equal(elements.has('testLimitAudio'),false);
+assert.ok(!fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8').includes('testLimitAudio'));
+console.log('PASS: accessible alarm toggle, audio unlock on enable, stop on disable, no test button');

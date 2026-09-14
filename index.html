@@ -235,7 +235,7 @@
   <section class="table-panel" aria-labelledby="apyTitle">
     <div class="panel-header apy-panel-header">
       <div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div>
-      <div class="apy-header-controls"><label title="Gap ≤ Threshold OR My Limit APY outside APY Range"><input id="limitAlerts" type="checkbox"> APY Alarm</label><button id="testLimitAudio" type="button">Test Alarm</button></div>
+      <div class="apy-header-controls"><button id="limitAlerts" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Gap ≤ Threshold OR My Limit APY outside APY Range">APY Alarm: OFF</button></div>
       <div class="asset-filter-group" role="group" aria-label="Asset filter">
         <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
         <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('onyc')">ONyc</button>
@@ -1000,6 +1000,10 @@
   .config-card .notification-actions button,.monitor-contracts button { min-height:38px; }
   .apy-header-controls { display:flex;align-items:center;gap:10px;margin-right:auto;align-self:flex-end; }
   .apy-header-controls label { white-space:nowrap;font-size:13px; }
+  .apy-alarm-toggle { min-height:38px;white-space:nowrap;border:1px solid #80642f;background:#241f13;color:#e6bd67; }
+  .apy-alarm-toggle[aria-pressed="true"] { background:#e6b854;border-color:#f2cd7d;color:#241b09;box-shadow:0 0 0 1px #e6b85433; }
+  .apy-alarm-toggle:hover { border-color:#f2cd7d;filter:brightness(1.08); }
+  .apy-alarm-toggle:focus-visible { outline:2px solid #f2cd7d;outline-offset:3px; }
   .apy-panel-header { flex-wrap:wrap; }
   .apy-panel-header .apy-header-controls { align-self:center; }
   @media(max-width:720px) { .apy-panel-header .asset-filter-group { grid-template-columns:repeat(3,minmax(0,1fr)); }.apy-panel-header .apy-header-controls { align-self:flex-start; } }

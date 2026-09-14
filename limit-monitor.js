@@ -24,7 +24,7 @@ function renderLimitAlarm() {
 function startLimitAlarmAudio() {
   if (!limitAlarm.entries.size || limitAlarm.source) return;
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Audio locked. Click Test Alarm.'); return;
+    limitAudioStatus('Audio locked. Turn APY Alarm off and on to enable audio.'); return;
   }
   try {
     // Continuous high-volume-style alarm on the audio clock; no silent polling gap.
@@ -45,7 +45,7 @@ function startLimitAlarmAudio() {
     source.buffer = buffer; source.loop = true; source.connect(limitAudio.destination);
     source.start(); limitAlarm.source = source;
     limitAudioStatus('');
-  } catch { limitAudioStatus('Playback failed. Click Test Alarm and check audio permissions.'); }
+  } catch { limitAudioStatus('Playback failed. Check site audio permissions, then turn APY Alarm off and on.'); }
 }
 function stopLimitAlarm() {
   limitAlarm.generation++;
@@ -74,18 +74,18 @@ function unlockLimitAudio() {
     if (!limitAudio) {
       limitAudio = new (window.AudioContext || window.webkitAudioContext)();
       limitAudio.onstatechange = () => {
-        if (limitAudio.state !== 'running' && limitAlarm.entries.size) limitAudioStatus('Audio suspended. Click Test Alarm to resume.');
+        if (limitAudio.state !== 'running' && limitAlarm.entries.size) limitAudioStatus('Audio suspended. Turn APY Alarm off and on to resume.');
       };
     }
     const generation = limitAlarm.generation;
     const resumed = limitAudio.resume();
-    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Click Test Alarm and allow site audio if needed.');
+    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Allow site audio, then turn APY Alarm off and on if needed.');
     return Promise.resolve(resumed).then(() => {
       const ready = limitAudio.state === 'running';
-      limitAudioStatus(ready ? '' : 'Audio blocked. Click Test Alarm or allow site audio.');
+      limitAudioStatus(ready ? '' : 'Audio blocked. Allow site audio, then turn APY Alarm off and on.');
       if (ready && generation === limitAlarm.generation) startLimitAlarmAudio();
       return ready;
-    }).catch(() => { limitAudioStatus('Cannot unlock audio. Click Test Alarm and check permissions.'); return false; });
+    }).catch(() => { limitAudioStatus('Cannot unlock audio. Check permissions, then turn APY Alarm off and on.'); return false; });
   } catch {
     limitAudioStatus('Audio unsupported or blocked.');
     return Promise.resolve(false);
@@ -93,7 +93,7 @@ function unlockLimitAudio() {
 }
 function playLimitApyAlert() {
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Audio not ready. Click Test Alarm.'); return;
+    limitAudioStatus('Audio not ready. Turn APY Alarm off and on.'); return;
   }
   try {
     [220, 660, 880, 660].forEach((frequency, i) => {
@@ -109,7 +109,7 @@ function playLimitApyAlert() {
       oscillator.start(start); oscillator.stop(start + 0.22);
     });
     limitAudioStatus('');
-  } catch { limitAudioStatus('Audio failed. Click Test Alarm to retry.'); }
+  } catch { limitAudioStatus('Audio failed. Turn APY Alarm off and on to retry.'); }
 }
 function limitGapAtOrBelow(marketPercent, manualPercent, threshold) {
   // Tolerance only removes floating-point subtraction noise at an equal boundary.
@@ -225,8 +225,8 @@ function evaluateLimitAlerts() {
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
-  const alarmLabel = document.getElementById('limitAlerts')?.parentElement;
-  if (alarmLabel) alarmLabel.title = 'Gap ≤ Threshold OR My Limit APY outside APY Range. Alarm until stopped.';
+  const alarmButton = document.getElementById('limitAlerts');
+  alarmButton.title = 'Gap ≤ Threshold OR My Limit APY outside APY Range. Alarm until stopped.';
   try {
     const current = localStorage.getItem(LIMIT_STORAGE);
     const saved = JSON.parse(current || '{}');
@@ -242,15 +242,13 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
       }
     }
   } catch { /* Corrupt or unavailable storage must not prevent use. */ }
-  document.getElementById('limitAlerts').addEventListener('change', event => {
-    limitState.enabled = event.target.checked; limitState.edges.clear();
+  alarmButton.addEventListener('click', () => {
+    limitState.enabled = !limitState.enabled; limitState.edges.clear();
+    alarmButton.setAttribute('aria-pressed', String(limitState.enabled));
+    alarmButton.textContent = `APY Alarm: ${limitState.enabled ? 'ON' : 'OFF'}`;
     if (!limitState.enabled) stopLimitAlarm();
     if (limitState.enabled) unlockLimitAudio();
     if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
-  });
-  document.getElementById('testLimitAudio').addEventListener('click', () => {
-    const generation = limitAlarm.generation;
-    unlockLimitAudio().then(ready => { if (ready && generation === limitAlarm.generation && !limitAlarm.entries.size) playLimitApyAlert(); });
   });
   document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
   const stopButton = document.getElementById('stopLimitAlarm');

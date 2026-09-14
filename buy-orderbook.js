@@ -77,13 +77,20 @@ if(typeof window!=='undefined'){
       const summary=`<span class="amount">${g.apy===null?'—':g.apy.toFixed(2)+'%'}</span><strong>${g.unknown?'—':buyQuantity(g.total)} YT${stale?' *':''}</strong><span class="book-hint">${g.rows.length} orders</span>`;
       if(node.summary.innerHTML!==summary)node.summary.innerHTML=summary;
       node.summary.title=stale?'Stale data':'0.1 percentage-point group · Estimated YT before fees';
-      const rows=g.rows.map(({order:o,apy,yt,position})=>{
+      const rows=g.rows.map(({order:o,apy,yt,position},rowIndex)=>{
         const verified=!stale&&position;
         const priceTitle=`Raw price: ${o.price_implied_apy} · ${apy===null?'Unknown APY':apy.toFixed(10)+'%'} · Book: ${o.orderbook_address}`;
-        return `<tr><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small></td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="At the exact raw price in this Orderbook; not the whole APY group">${verified?`${position.index} / ${position.total}`:'Unverified'}${stale?'<small>Stale</small>':''}</td></tr>`;
+        const watch=typeof orderWatchButton==='function'?orderWatchButton(o,view.dataMarket||view.market,view.assetKey,stale):'';
+        const attrs=typeof orderWatchRowAttributes==='function'?orderWatchRowAttributes(o,view.dataMarket||view.market,view.assetKey):'';
+        if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{index:rowIndex+1,total:g.rows.length,apy:g.apy,stale,checkedAt:view.checkedAt});
+        return `<tr ${attrs}><td title="Display position in this APY group; not verified execution priority">${rowIndex+1} / ${g.rows.length}${stale?' *':''}</td><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small> ${watch}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="At the exact raw price in this Orderbook; not the whole APY group">${verified?`${position.index} / ${position.total}`:'Unverified'}${stale?'<small>Stale</small>':''}</td></tr>`;
       }).join('');
-      const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Order ID / Type</th><th>Order APY</th><th>Remaining YT</th><th>Queue Position</th></tr></thead><tbody>${rows}</tbody></table>`;
-      if(node.scroll.innerHTML!==html)node.scroll.innerHTML=html;
+      const html=`<table class="book-orders"><thead><tr><th>Group Position</th><th>Wallet</th><th>Order ID / Type</th><th>Order APY</th><th>Remaining YT</th><th>Same-price Queue</th></tr></thead><tbody>${rows}</tbody></table>`;
+      if(node.scroll.innerHTML!==html){
+        const focusKey=document.activeElement?.dataset?.orderWatch;
+        node.scroll.innerHTML=html;
+        if(focusKey)for(const button of node.scroll.querySelectorAll('button[data-order-watch]'))if(button.dataset.orderWatch===focusKey)button.focus({preventScroll:true});
+      }
       // Do not detach unchanged accordions: that resets scroll anchoring/focus.
       if(view.content.children[groupIndex]!==node.details)view.content.insertBefore(node.details,view.content.children[groupIndex]||null);
       groupIndex++;
@@ -116,7 +123,7 @@ if(typeof window!=='undefined'){
       if(!view){
         const details=document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');
         details.className='book-market';status.className='book-status';status.setAttribute('role','status');details.append(summary,status,content);root.appendChild(details);
-        view={details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
+        view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
         details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
       const market=farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';

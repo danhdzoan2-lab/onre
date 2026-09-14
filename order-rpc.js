@@ -2,7 +2,7 @@
 'use strict';
 const orderRpcState={books:new Map(),flights:new Map(),retryAt:0};
 async function orderRpc(method,params){
-  if(!['getAccountInfo','getBlockTime'].includes(method))throw Error('Unsupported read-only book request');
+  if(!['getAccountInfo','getBlockTime','getTransaction','getBlock'].includes(method))throw Error('Unsupported read-only book request');
   if(Date.now()<orderRpcState.retryAt)throw Error('Orderbook rate limited; waiting to retry');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
   try{

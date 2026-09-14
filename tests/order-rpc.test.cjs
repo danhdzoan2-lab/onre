@@ -17,7 +17,7 @@ const run=s=>vm.runInContext(s,ctx);
  await assert.rejects(run('getOrderBookSnapshot("b")'),/rate limited/);
  assert.equal(run('orderRpcState.books.get("b").book'),book,'retain previous snapshot');
  const count=calls;await assert.rejects(run('getOrderBookSnapshot("b")'),/rate limited/);assert.equal(calls,count);
- await assert.rejects(run('orderRpc("getTransaction",[])'),/Unsupported/);
+ await assert.rejects(run('orderRpc("sendTransaction",[])'),/Unsupported/);
  assert.equal(run('orderRpcState.flights.size'),0);
  console.log('PASS: on-demand read-only snapshots, shared requests, cache, backoff and stale retention');
 })().catch(e=>{console.error(e);process.exitCode=1;});

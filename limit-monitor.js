@@ -9,6 +9,7 @@ function renderLimitAlarmRow(row) {
   row.dataset.alarm = active ? 'true' : 'false';
 }
 function renderLimitAlarm() {
+  if (typeof renderOrderWatches === 'function') renderOrderWatches();
   for (const key of Object.keys(ASSETS)) {
     const row = document.getElementById(`apy-${key}`);
     if (row) renderLimitAlarmRow(row);
@@ -48,6 +49,7 @@ function startLimitAlarmAudio() {
   } catch { limitAudioStatus('Playback failed. Check site audio permissions, then turn APY Alarm off and on.'); }
 }
 function stopLimitAlarm() {
+  if (typeof acknowledgeOrderWatches === 'function') acknowledgeOrderWatches();
   limitAlarm.generation++;
   if (limitAlarm.source) {
     try { limitAlarm.source.stop(); limitAlarm.source.disconnect(); } catch { /* Already stopped. */ }
@@ -81,11 +83,11 @@ function updateLimitNotificationPermission() {
     : permission === 'unsupported' ? 'Desktop notifications unavailable. Open this page in Chrome or Edge.'
     : 'Allow browser notifications to receive APY desktop alerts.');
 }
-async function notifyLimitAlarm(body) {
+async function notifyLimitAlarm(body, isRelevant = () => true) {
   updateLimitNotificationPermission();
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const generation = limitAlarm.generation;
-  const isCurrent = () => limitState.enabled && limitAlarm.entries.size > 0 && generation === limitAlarm.generation;
+  const isCurrent = () => limitState.enabled && limitAlarm.entries.size > 0 && generation === limitAlarm.generation && isRelevant();
   const options = { body, tag: 'limit-apy', renotify: true, requireInteraction: true, silent: true };
   try {
     if (typeof showBrowserNotification === 'function') {
@@ -253,7 +255,7 @@ function evaluateLimitAlerts() {
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
   const alarmButton = document.getElementById('limitAlerts');
-  alarmButton.title = 'Gap ≤ Threshold OR My Limit APY outside APY Range. Alarm until stopped.';
+  alarmButton.title = 'Gap ≤ Threshold, My Limit APY outside APY Range, or a verified watched order at front. Alarm until stopped.';
   try {
     const current = localStorage.getItem(LIMIT_STORAGE);
     const saved = JSON.parse(current || '{}');
@@ -275,6 +277,7 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
     alarmButton.textContent = `APY Alarm: ${limitState.enabled ? 'ON' : 'OFF'}`;
     if (!limitState.enabled) stopLimitAlarm();
     if (limitState.enabled) unlockLimitAudio();
+    if (typeof pollOrderWatches === 'function') { renderOrderWatches(); void pollOrderWatches(); }
     updateLimitNotificationPermission();
     if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission().then(updateLimitNotificationPermission).catch(updateLimitNotificationPermission);

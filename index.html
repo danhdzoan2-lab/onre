@@ -275,6 +275,10 @@
   </section>
   <section class="table-panel" aria-labelledby="buyBookTitle">
     <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span class="book-hint" title="Buy YT and sell PT · Estimated YT before fees · Queue at the exact price only">Estimated YT · Same-price queue</span></div>
+    <div id="watchedBuyOrders" hidden>
+      <p id="orderWatchStatus" class="book-status" role="status"></p>
+      <div id="orderWatchList" aria-label="Watched buy orders"></div>
+    </div>
     <div id="buyBooks"></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">
@@ -997,6 +1001,8 @@
 <script src="orderbook.js"></script>
 <script src="order-rpc.js"></script>
 <script src="buy-orderbook.js"></script>
+<script src="order-placement.js"></script>
+<script src="order-watch.js"></script>
 <style>
  .book-market{border-top:1px solid var(--line)}
  .book-market>summary,.book-group>summary{cursor:pointer;line-height:1.4}
@@ -1017,6 +1023,18 @@
  .book-orders small{display:block;color:var(--muted);font-size:12px}
  .book-orders td:nth-child(2) small{display:inline;margin-left:6px}
  .book-orders td:nth-child(2) small::before{content:'·';margin-right:6px}
+ .order-watch-button{min-height:30px;padding:4px 8px;margin-left:6px;font-size:12px}
+ .order-watch-button[aria-pressed="true"]{background:#3c331e;color:#f2c565;border-color:#94753a}
+ .book-orders tr[data-watched="true"]{background:#252315}
+ #watchedBuyOrders{padding:10px 14px;border-top:1px solid var(--line)}
+ #orderWatchStatus{padding:0;margin:0 0 6px;color:#e6bd67}
+ #orderWatchStatus:empty{display:none}
+ .order-watch-item{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--line);border-radius:6px;margin:4px 0;font-size:14px}
+ .order-watch-item>span:first-child{font-weight:600}.order-watch-item>span:nth-child(2){color:var(--muted);margin-left:auto}
+ .order-watch-item button{min-height:32px;padding:5px 10px}
+ .order-placement{flex-basis:100%;overflow-wrap:anywhere}
+ .book-orders tr[data-order-alarm="true"],.order-watch-item[data-order-alarm="true"]{animation:apy-alarm-pulse 1.6s ease-in-out infinite}
+ @media(prefers-reduced-motion:reduce){.book-orders tr[data-order-alarm="true"],.order-watch-item[data-order-alarm="true"]{animation:none;background:#65301f}}
  @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 6px 4px}.book-group>summary{grid-template-columns:10px 58px minmax(0,1fr) auto;justify-content:stretch;gap:6px;padding:8px;font-size:13px}.book-group>summary .book-hint{font-size:12px}.book-orders th,.book-orders td{padding:8px}}
 </style>
 <style>

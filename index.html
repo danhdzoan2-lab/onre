@@ -981,19 +981,25 @@
 <script src="buy-orderbook.js"></script>
 <style>
  .book-market{border-top:1px solid var(--line)}
- .book-market>summary,.book-group>summary{padding:16px;cursor:pointer;line-height:1.5}
+ .book-market>summary,.book-group>summary{cursor:pointer;line-height:1.4}
+ .book-market>summary{padding:12px 16px}
  .book-market>summary strong{margin-right:14px}.book-hint,.book-status{font-size:13px;color:var(--muted)}
  .book-status{padding:0 16px}.book-status:empty{display:none}
- .book-group{margin:0 16px 10px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
- .book-group>summary{display:list-item;background:rgba(97,205,140,.045)}
- .book-group>summary .amount{display:inline-block;min-width:105px;margin-left:8px}
- .book-group>summary .book-hint{margin-left:16px}
+ .book-group{margin:0 12px 4px;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+ .book-group:last-child{margin-bottom:10px}
+ .book-group>summary{display:grid;grid-template-columns:12px 76px 170px auto;justify-content:start;align-items:center;gap:10px;padding:7px 12px;font-size:14px;list-style:none;background:rgba(97,205,140,.045);font-variant-numeric:tabular-nums}
+ .book-group>summary::-webkit-details-marker{display:none}
+ .book-group>summary::before{content:'▸';color:var(--muted)}
+ .book-group[open]>summary::before{content:'▾'}
+ .book-group>summary .amount{min-width:0;margin:0}
+ .book-group>summary>strong{text-align:right;white-space:nowrap}
+ .book-group>summary .book-hint{margin:0;white-space:nowrap}
  .book-scroll{overflow:auto}.book-orders{min-width:740px;width:100%}
- .book-orders td{white-space:nowrap}
+ .book-orders td{white-space:nowrap}.book-orders th,.book-orders td{padding:8px 12px}
  .book-orders small{display:block;color:var(--muted);font-size:12px}
  .book-orders td:nth-child(2) small{display:inline;margin-left:6px}
  .book-orders td:nth-child(2) small::before{content:'·';margin-right:6px}
- @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 8px 8px}.book-group>summary{padding:12px}.book-group>summary .book-hint{display:block;margin-left:8px}.book-orders th,.book-orders td{padding:12px}}
+ @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 6px 4px}.book-group>summary{grid-template-columns:10px 58px minmax(0,1fr) auto;justify-content:stretch;gap:6px;padding:8px;font-size:13px}.book-group>summary .book-hint{font-size:12px}.book-orders th,.book-orders td{padding:8px}}
 </style>
 <style>
   .config-card { align-items:flex-end; }

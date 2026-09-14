@@ -57,6 +57,14 @@ function stopLimitAlarm() {
   // Preserve edge states: acknowledging does not re-arm a still-triggered market.
   renderLimitAlarm();
 }
+function handleLimitAlarmSpace(event) {
+  if ((event.code !== 'Space' && event.key !== ' ') || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || !limitAlarm.entries.size) return;
+  const target = event.target;
+  if (target?.isContentEditable || target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+  event.preventDefault(); // Do not scroll or activate a focused button while silencing.
+  event.stopPropagation();
+  stopLimitAlarm();
+}
 function limitAudioStatus(message) {
   const status = document.getElementById('limitAudioStatus');
   if (status) status.textContent = message;
@@ -245,6 +253,10 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
     unlockLimitAudio().then(ready => { if (ready && generation === limitAlarm.generation && !limitAlarm.entries.size) playLimitApyAlert(); });
   });
   document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
+  const stopButton = document.getElementById('stopLimitAlarm');
+  stopButton.textContent = 'Stop Alarm · Space';
+  stopButton.setAttribute('aria-keyshortcuts', 'Space');
+  window.addEventListener('keydown', handleLimitAlarmSpace, { capture: true });
   setInterval(renderLimitAlarm, 2000);
   saveLimits(); renderApy();
 });

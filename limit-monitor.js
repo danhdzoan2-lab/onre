@@ -69,6 +69,36 @@ function limitAudioStatus(message) {
   const status = document.getElementById('limitAudioStatus');
   if (status) status.textContent = message;
 }
+function limitNotificationStatus(message) {
+  const status = document.getElementById('limitNotificationStatus');
+  if (status) status.textContent = message;
+}
+function updateLimitNotificationPermission() {
+  if (!limitState.enabled) { limitNotificationStatus(''); return; }
+  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+  limitNotificationStatus(permission === 'granted' ? '' : permission === 'denied'
+    ? 'Desktop notifications blocked. Allow notifications for this site in your browser settings.'
+    : permission === 'unsupported' ? 'Desktop notifications unavailable. Open this page in Chrome or Edge.'
+    : 'Allow browser notifications to receive APY desktop alerts.');
+}
+async function notifyLimitAlarm(body) {
+  updateLimitNotificationPermission();
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const generation = limitAlarm.generation;
+  const isCurrent = () => limitState.enabled && limitAlarm.entries.size > 0 && generation === limitAlarm.generation;
+  const options = { body, tag: 'limit-apy', renotify: true, requireInteraction: true, silent: true };
+  try {
+    if (typeof showBrowserNotification === 'function') {
+      const shown = await showBrowserNotification('APY Alarm', options, isCurrent);
+      if (shown === false && isCurrent()) limitNotificationStatus('Desktop notification failed. Check browser and Windows notification settings.');
+    } else if (isCurrent()) {
+      const notice = new Notification('APY Alarm', options);
+      notice.onclick = () => { window.focus(); notice.close(); };
+    }
+  } catch {
+    if (isCurrent()) limitNotificationStatus('Desktop notification failed. Check browser and Windows notification settings.');
+  }
+}
 function unlockLimitAudio() {
   try {
     if (!limitAudio) {
@@ -218,10 +248,7 @@ function evaluateLimitAlerts() {
     const body = messages.join('\n');
     startLimitAlarmAudio();
     renderLimitAlarm();
-    // Synchronous notification creation: no delayed callback can alert for a previous wallet.
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try { new Notification('APY Alarm', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
-    }
+    void notifyLimitAlarm(body);
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
@@ -248,7 +275,10 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
     alarmButton.textContent = `APY Alarm: ${limitState.enabled ? 'ON' : 'OFF'}`;
     if (!limitState.enabled) stopLimitAlarm();
     if (limitState.enabled) unlockLimitAudio();
-    if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+    updateLimitNotificationPermission();
+    if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().then(updateLimitNotificationPermission).catch(updateLimitNotificationPermission);
+    }
   });
   document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
   const stopButton = document.getElementById('stopLimitAlarm');

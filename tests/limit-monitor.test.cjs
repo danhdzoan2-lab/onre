@@ -16,7 +16,7 @@ const ctx = vm.createContext({ Date, Map, BigInt, Number, JSON,
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname, '../limit-monitor.js'), 'utf8'), ctx);
 const run = s => vm.runInContext(s, ctx);
 // Keep these threshold/audio-note regression tests independent of the latched alarm lifecycle.
-run(`startLimitAlarmAudio = playLimitApyAlert; limitAlarm.entries.has=()=>false; limitAlarm.entries.set=()=>{};`);
+run(`startLimitAlarmAudio = playLimitApyAlert; limitAlarm.entries.has=()=>false; limitAlarm.entries.get=()=>undefined;`);
 for (const v of ['', ' ', '-1', 'NaN', 'Infinity', '1e4', '10x']) assert.equal(run(`limitNumber(${JSON.stringify(v)})`), null);
 assert.equal(run(`limitNumber('0')`), 0);
 run(`limitState.enabled=true;

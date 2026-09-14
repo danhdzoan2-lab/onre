@@ -6,6 +6,12 @@ for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){
  else new vm.Script(match[2]);
 }
 assert.equal((html.match(/id="buyBooks"/g)||[]).length,1);
+const apySection=html.slice(html.indexOf('aria-labelledby="apyTitle"'),html.indexOf('id="apyRows"'));
+for(const token of ['all','onyc','strcx','sronyc','eusx','usx']){
+ assert.equal((html.match(new RegExp(`id="${token}FilterBtn"`,'g'))||[]).length,1);
+ assert.ok(apySection.includes(`id="${token}FilterBtn"`));
+}
+assert.ok(!html.includes('Exponent Markets ↗'));
 assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="buyBooks"'));
 assert.ok(html.indexOf('id="buyBooks"')<html.indexOf('id="panelTitle"'));
 assert.doesNotMatch(html,/orderMarkers|orderMarkButtons|importOrder|order-monitor\.js/);

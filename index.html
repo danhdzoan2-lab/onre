@@ -233,7 +233,18 @@
   </section>
 
   <section class="table-panel" aria-labelledby="apyTitle">
-    <div class="panel-header"><div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div><div class="apy-header-controls"><label title="Market APY − My APY ≤ Threshold"><input id="limitAlerts" type="checkbox"> APY Alarm</label><button id="testLimitAudio" type="button">Test Alarm</button></div><a class="sig-link" href="https://app.exponent.finance/en" target="_blank" rel="noopener noreferrer">Exponent Markets ↗</a></div>
+    <div class="panel-header apy-panel-header">
+      <div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div>
+      <div class="apy-header-controls"><label title="Gap ≤ Threshold OR My Limit APY outside APY Range"><input id="limitAlerts" type="checkbox"> APY Alarm</label><button id="testLimitAudio" type="button">Test Alarm</button></div>
+      <div class="asset-filter-group" role="group" aria-label="Asset filter">
+        <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
+        <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('onyc')">ONyc</button>
+        <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('strcx')">STRCx</button>
+        <button id="sronycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('sronyc')">srONyc</button>
+        <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
+        <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
+      </div>
+    </div>
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
     <div class="apy-note">
       <p id="limitAudioStatus" role="status"></p>
@@ -259,14 +270,6 @@
         <div class="panel-title" id="panelTitle">Exponent CLMM Transactions</div>
       </div>
       <div class="panel-actions">
-        <div class="asset-filter-group" role="group" aria-label="Asset filter">
-          <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
-          <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by ONyc (OnRe) mint 5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5" onclick="setAssetFilter('onyc')">ONyc</button>
-          <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" title="Filter the feed and alerts by STRCx mint Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH" onclick="setAssetFilter('strcx')">STRCx</button>
-          <button id="sronycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('sronyc')">srONyc</button>
-          <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
-          <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
-        </div>
         <button id="rfBtn" type="button" onclick="fetchAll()"><span id="rfIcon">↻</span> Refresh</button>
         <div class="tx-badge" id="txBadge">0 txs</div>
       </div>
@@ -997,6 +1000,9 @@
   .config-card .notification-actions button,.monitor-contracts button { min-height:38px; }
   .apy-header-controls { display:flex;align-items:center;gap:10px;margin-right:auto;align-self:flex-end; }
   .apy-header-controls label { white-space:nowrap;font-size:13px; }
+  .apy-panel-header { flex-wrap:wrap; }
+  .apy-panel-header .apy-header-controls { align-self:center; }
+  @media(max-width:720px) { .apy-panel-header .asset-filter-group { grid-template-columns:repeat(3,minmax(0,1fr)); }.apy-panel-header .apy-header-controls { align-self:flex-start; } }
   .apy-note:empty { display:none; }
   @media(max-width:720px) { .config-card .notification-actions { flex-direction:row; }.config-card .notification-actions button { width:auto; }.apy-header-controls { margin-right:0; } }
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }

@@ -252,11 +252,6 @@
     <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span class="book-hint" title="Buy YT and sell PT · Estimated YT before fees · Queue at the exact price only">Estimated YT · Same-price queue</span></div>
     <div id="buyBooks"></div>
   </section>
-  <section class="table-panel" id="orderMarkersPanel" aria-labelledby="orderMarkersTitle">
-    <div class="panel-header"><h2 class="panel-title" id="orderMarkersTitle">Marked YT Orders</h2><form id="importOrderForm" class="order-import"><input id="importOrder" aria-label="Post Offer transaction" placeholder="Post Offer signature or Solscan link" autocomplete="off"><button type="submit">Mark order</button></form></div>
-    <p id="orderStatus" class="apy-note" role="status">Mark your Post Offer to check its live queue.</p>
-    <div id="orderMarkers" class="order-markers"></div>
-  </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
       <div class="panel-heading">
@@ -713,7 +708,6 @@
           changes,
           interaction: getProgramInstructions(tx, contract.address),
           success: !tx.meta?.err,
-          postOffers: typeof ExponentBook !== 'undefined' ? ExponentBook.postEvents(tx) : [],
           relatedAssets: Object.keys(ASSETS).filter(key => transactionTouchesMint(tx, ASSETS[key].mint)),
           isNew: !seenSigs.has(top[i].signature)
         });
@@ -792,7 +786,7 @@
           </div></div>
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Interaction</div>
-            <div class="tx-card-value">${escapeHtml(tx.interaction || 'Other')}${typeof orderMarkButtons === 'function' ? orderMarkButtons(tx) : ''}</div>
+            <div class="tx-card-value">${escapeHtml(tx.interaction || 'Other')}</div>
           </div></div>
           <div class="tx-card-row"><div>
             <div class="tx-card-label">Wallet</div>
@@ -816,7 +810,7 @@
       return `<tr class="${rowClass}">
         <td><a class="sig-link" href="https://solscan.io/tx/${tx.sig}" target="_blank" rel="noopener noreferrer">${escapeHtml(sh(tx.sig))}</a></td>
         <td><span class="${statusClass}">${statusLabel}</span></td>
-        <td>${escapeHtml(tx.interaction || 'Other')}${typeof orderMarkButtons === 'function' ? orderMarkButtons(tx) : ''}</td>
+        <td>${escapeHtml(tx.interaction || 'Other')}</td>
         <td class="wallet-addr" title="${escapeHtml(tx.from)}">${escapeHtml(sh(tx.from))}</td>
         <td class="amount">${amountDisplay}</td>
         <td>${escapeHtml(ta(tx.ts))}</td>
@@ -980,7 +974,7 @@
 <script src="limit-monitor.js"></script>
 <script src="reward-range.js"></script>
 <script src="orderbook.js"></script>
-<script src="order-monitor.js"></script>
+<script src="order-rpc.js"></script>
 <script src="buy-orderbook.js"></script>
 <style>
  .book-market{border-top:1px solid var(--line)}
@@ -992,8 +986,8 @@
  .book-group>summary .amount{display:inline-block;min-width:105px;margin-left:8px}
  .book-group>summary .book-hint{margin-left:16px}
  .book-scroll{overflow:auto}.book-orders{min-width:740px;width:100%}
- .book-orders td{white-space:nowrap}.book-orders .book-marked td{background:rgba(255,195,62,.12);border-bottom-color:var(--amber)}
- .book-orders small{display:block;color:var(--muted);font-size:12px}.book-orders button{padding:5px 9px;min-height:30px}
+ .book-orders td{white-space:nowrap}
+ .book-orders small{display:block;color:var(--muted);font-size:12px}
  @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 8px 8px}.book-group>summary{padding:12px}.book-group>summary .book-hint{display:block;margin-left:8px}.book-orders th,.book-orders td{padding:12px}}
 </style>
 <style>
@@ -1004,18 +998,7 @@
   .apy-header-controls { display:flex;align-items:center;gap:10px;margin-right:auto;align-self:flex-end; }
   .apy-header-controls label { white-space:nowrap;font-size:13px; }
   .apy-note:empty { display:none; }
-  .order-import { display:flex;gap:8px;flex-wrap:wrap; }
-  .order-import input { min-width:240px;background:#0b0e09;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px; }
-  .order-markers { padding:0 16px 16px;display:grid;gap:12px; }
-  .order-marker { border:1px solid var(--line);border-radius:8px;padding:12px; }
-  .order-marker header { display:flex;gap:12px;align-items:center;flex-wrap:wrap; }
-  .order-marker header button { margin-left:auto; }
-  .order-marker p { margin:8px 0 0;font-size:13px; }
-  .order-metrics { display:flex;gap:20px;flex-wrap:wrap;margin-top:12px; }
-  .order-metrics span { display:grid;gap:4px;font-size:12px; }
-  .order-metrics strong { color:var(--amber);font-size:16px; }
-  .mark-order { display:inline-block;margin:4px 0 0 8px;padding:5px 8px;font-size:11px; }
-  @media(max-width:720px) { .config-card .notification-actions { flex-direction:row; }.config-card .notification-actions button { width:auto; }.apy-header-controls { margin-right:0; }.order-import { width:100%; }.order-import input { min-width:0;flex:1; } }
+  @media(max-width:720px) { .config-card .notification-actions { flex-direction:row; }.config-card .notification-actions button { width:auto; }.apy-header-controls { margin-right:0; } }
   .spinning { animation: spin 0.7s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>

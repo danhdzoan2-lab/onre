@@ -13,7 +13,7 @@ const market={vaultAddress:'v',maturityDateUnixTs:Date.now()/1000+86400,orderboo
 let calls=0,respond,timer,tick,response={ok:true,json:async()=>[]};
 const context={window:{addEventListener(){}},document:{createElement:()=>new Element(),getElementById:()=>root,addEventListener(){}},
  Date,Map,Set,BigInt,Number,AbortController,ASSETS:assets,selectedAssets:new Set(),apyState:{markets:[market],checkedAt:Date.now(),error:''},
- farthestApyMarket:()=>market,apyDate:String,escapeHtml:String,sh:String,orderWatch:{markers:[],books:new Map()},
+ farthestApyMarket:()=>market,apyDate:String,escapeHtml:String,sh:String,orderRpcState:{books:new Map()},
  getOrderBookSnapshot:async()=>({error:''}),apyRetryDelay:()=>30000,
  setInterval:fn=>{tick=fn;},setTimeout:fn=>{timer=fn;return 1;},clearTimeout(){},
  fetch:(url,options)=>{calls++;return new Promise((resolve,reject)=>{respond=()=>resolve(response);options.signal.addEventListener('abort',()=>reject(Object.assign(Error('timeout'),{name:'AbortError'})));});}};

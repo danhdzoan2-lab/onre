@@ -7,5 +7,8 @@ for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){
 }
 assert.equal((html.match(/id="buyBooks"/g)||[]).length,1);
 assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="buyBooks"'));
-assert.ok(html.indexOf('id="buyBooks"')<html.indexOf('id="orderMarkersPanel"'));
-console.log('PASS: script syntax, local references and Buy Orderbook placement');
+assert.ok(html.indexOf('id="buyBooks"')<html.indexOf('id="panelTitle"'));
+assert.doesNotMatch(html,/orderMarkers|orderMarkButtons|importOrder|order-monitor\.js/);
+assert.doesNotMatch(fs.readFileSync(path.join(root,'buy-orderbook.js'),'utf8'),/orderWatch|data-buy-mark|data-remove-marker|localStorage/);
+assert.match(html,/SIGNATURE_SCAN_LIMIT = 50/);assert.match(html,/DISPLAY_LIMIT = 50/);
+console.log('PASS: script syntax, references, Buy Orderbook placement and removal of all marking controls');

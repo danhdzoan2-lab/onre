@@ -1,9 +1,9 @@
-# Read-only YT order tracking
+# Read-only Buy Orderbook
 
-Use **Mark #…** on a supported buy-YT Post Offer, or paste its Solscan transaction
-link into **Marked YT Orders**. Multiple markers are saved in browser localStorage;
-no wallet connection or wallet-address input is required. Unmarking only removes
-the local marker and never cancels an order.
+Current behavior is documented in **Buy Orderbook (14 Sep 2026)** below. Manual
+order marking and its background monitoring have been removed at the user's
+request. The following earlier verification notes are retained as historical
+decoder research, not instructions for the current UI.
 
 ## Verification
 
@@ -60,6 +60,13 @@ Run regression checks: `node --test tests/*.cjs`.
 
 ## Buy Orderbook (14 Sep 2026)
 
+Update: the user requested removal of Marked YT Orders after the detailed book
+became available. The marking UI, Mark/Unmark buttons, marker storage access and
+background history synchronization have been removed. Earlier marked-order notes
+above are historical implementation records only. `order-rpc.js` now supplies
+on-demand read-only snapshots for expanded Buy Orderbook markets; it starts no
+background work. Existing saved APY inputs and alarms are unaffected.
+
 The collapsed-by-default market view uses `/api/open-orders/vault/{vaultAddress}`.
 It follows the same mint filter and farthest-active-maturity selection as APY.
 Farm bids include `buyYT` and virtual `sellPT`. Each order's raw log rate is
@@ -79,8 +86,8 @@ above when exchange-rate references or sampling times differ.
 Queue verification requires API/on-chain vault, book maturity, offer index,
 owner, raw price, side/virtual flag, creation/expiry, and remaining amount to match.
 IDs alone never identify an order. Confirmed linked-list snapshots are shared
-with marked-order monitoring, deduplicated per book and polled only for open,
-selected markets (unless that book also has an independently tracked marker).
+across expanded views, deduplicated per book and polled only for open,
+selected markets.
 All requests time out after eight seconds; API/RPC 429 responses use Retry-After.
 Closed or filtered markets do not start new detail requests. Stale snapshots keep
 their estimates, but no current FIFO position is claimed.

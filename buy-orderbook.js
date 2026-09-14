@@ -39,12 +39,7 @@ function buyQueuePosition(order,market,snapshot,now) {
     return index<0?null:{index:index+1,total:chain.length};
   }catch{return null;}
 }
-function buyMarkedOrder(order,markers) {
-  return markers.find(m=>m.signature===order.tx_signature&&m.book===order.orderbook_address&&m.vault===order.vault_address
-    &&m.id===order.offer_idx&&m.owner===order.user_address&&m.price===order.price_implied_apy
-    &&m.ts===Date.parse(order.created_at)/1000&&m.expirySeconds===order.expiry_seconds&&order.order_type==='buyYT');
-}
-function buyGroups(orders,market,snapshots,now,markers=[]) {
+function buyGroups(orders,market,snapshots,now) {
   const groups=new Map();
   for(const order of buyOpenOrders(orders,market,now)){
     const apy=buyOrderApy(order.price_implied_apy),bucket=apy===null||!Number.isFinite(apy)?null:Math.round(apy*10);
@@ -52,7 +47,7 @@ function buyGroups(orders,market,snapshots,now,markers=[]) {
     if(!groups.has(key))groups.set(key,{key,apy:bucket===null?null:bucket/10,rows:[],total:0,unknown:false});
     const group=groups.get(key),yt=apy===null?null:buyYtEstimate(order,market,now);
     const position=buyQueuePosition(order,market,snapshots.get(order.orderbook_address),now);
-    group.rows.push({order,apy,yt,position,marker:buyMarkedOrder(order,markers)});
+    group.rows.push({order,apy,yt,position});
     if(yt===null)group.unknown=true;else group.total+=yt;
   }
   for(const g of groups.values())g.rows.sort((a,b)=>b.order.price_implied_apy-a.order.price_implied_apy
@@ -61,7 +56,7 @@ function buyGroups(orders,market,snapshots,now,markers=[]) {
     ||String(a.order.id).localeCompare(String(b.order.id)));
   return [...groups.values()].sort((a,b)=>(b.apy??-Infinity)-(a.apy??-Infinity));
 }
-if(typeof module!=='undefined')module.exports={buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyMarkedOrder,buyGroups};
+if(typeof module!=='undefined')module.exports={buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups};
 
 if(typeof window!=='undefined'){
   const buyViews=new Map();
@@ -70,7 +65,7 @@ if(typeof window!=='undefined'){
     const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>12000||Date.now()-view.checkedAt>12000;
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.orders)return;
-    const groups=buyGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000,orderWatch.markers),live=new Set();
+    const groups=buyGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();
     if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=stale?'Stale · No buy orders in last response':'No open buy orders';
     let groupIndex=0;
     for(const g of groups){
@@ -82,12 +77,10 @@ if(typeof window!=='undefined'){
       const summary=`<span class="amount">${g.apy===null?'—':g.apy.toFixed(2)+'%'}</span><strong>${g.unknown?'—':buyQuantity(g.total)} YT${stale?' *':''}</strong><span class="book-hint">${g.rows.length} orders</span>`;
       if(node.summary.innerHTML!==summary)node.summary.innerHTML=summary;
       node.summary.title=stale?'Stale data':'0.1 percentage-point group · Estimated YT before fees';
-      const rows=g.rows.map(({order:o,apy,yt,position,marker})=>{
+      const rows=g.rows.map(({order:o,apy,yt,position})=>{
         const verified=!stale&&position;
         const priceTitle=`Raw price: ${o.price_implied_apy} · ${apy===null?'Unknown APY':apy.toFixed(10)+'%'} · Book: ${o.orderbook_address}`;
-        const action=marker?`<button type="button" data-remove-marker="${escapeHtml(orderKey(marker))}">Unmark</button>`
-          :o.order_type==='buyYT'&&verified&&/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(o.tx_signature||'')?`<button type="button" data-buy-mark="${escapeHtml(o.tx_signature)}" data-buy-id="${o.offer_idx}">Mark</button>`:'';
-        return `<tr class="${marker?'book-marked':''}"><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a>${marker?'<small>Marked order</small>':''}</td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small>${action}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="At the exact raw price in this Orderbook; not the whole APY group">${verified?`${position.index} / ${position.total}`:'Unverified'}${stale?'<small>Stale</small>':''}</td></tr>`;
+        return `<tr><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td>#${escapeHtml(o.offer_idx)} <small>${escapeHtml(o.order_type)}</small></td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td><td title="At the exact raw price in this Orderbook; not the whole APY group">${verified?`${position.index} / ${position.total}`:'Unverified'}${stale?'<small>Stale</small>':''}</td></tr>`;
       }).join('');
       const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Order ID / Type</th><th>Order APY</th><th>Remaining YT</th><th>Queue Position</th></tr></thead><tbody>${rows}</tbody></table>`;
       if(node.scroll.innerHTML!==html)node.scroll.innerHTML=html;
@@ -108,7 +101,7 @@ if(typeof window!=='undefined'){
       const data=await response.json();if(!Array.isArray(data)||data.some(o=>!o||typeof o!=='object'||Array.isArray(o)))throw Error('Invalid open-order data');
       // Wait for every book, even when one fails, so the next poll never overlaps.
       const results=await Promise.all((market.orderbookAddresses||[]).map(async address=>{
-        try{return [address,await getOrderBookSnapshot(address)];}catch(e){return [address,{...orderWatch.books.get(address),error:e.name==='AbortError'?'Orderbook timed out':e.message}];}
+        try{return [address,await getOrderBookSnapshot(address)];}catch(e){return [address,{...orderRpcState.books.get(address),error:e.name==='AbortError'?'Orderbook timed out':e.message}];}
       }));
       if(view.identity!==identity)return;
       view.orders=data;view.dataMarket=market;view.snapshots=new Map(results);view.checkedAt=Date.now();view.error=results.some(([,s])=>s.error)?'On-chain queue unavailable; positions unverified':'';
@@ -135,17 +128,6 @@ if(typeof window!=='undefined'){
       if(view.details.open&&!view.details.hidden){if(market){renderBuyMarket(view);void refreshBuyMarket(view);}else view.status.textContent='No active market';}
     }
   }
-  document.addEventListener('click',async e=>{
-    const button=e.target.closest('[data-buy-mark]');if(!button)return;
-    button.disabled=true;
-    try{
-      const tx=await orderRpc('getTransaction',[button.dataset.buyMark,{encoding:'json',maxSupportedTransactionVersion:0,commitment:'finalized'}]);
-      const events=ExponentBook.postEvents(tx).filter(o=>o.id===Number(button.dataset.buyId)&&o.side===2&&!o.virtual);
-      if(events.length!==1)throw Error('Order event is ambiguous; use the Post Offer transaction to mark it');
-      await importOrderMarker(button.dataset.buyMark,`${events[0].outer}:${events[0].inner}`);
-      renderBuyBooks();
-    }catch(error){orderWatch.error=error.message;renderOrderMarkers();button.disabled=false;}
-  });
   window.addEventListener('load',renderBuyBooks);
   window.renderBuyBooks=renderBuyBooks;
   setInterval(renderBuyBooks,2000);

@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 global.ExponentBook=require('../orderbook');
-const {buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyMarkedOrder,buyGroups}=require('../buy-orderbook');
+const {buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups}=require('../buy-orderbook');
 const now=1800000000,created=now-100,expiry=now+10000;
 const market={vaultAddress:'v',orderbookAddresses:['b'],maturityDateUnixTs:now+31536000,syExchangeRate:1.02,decimals:6};
 const order={id:100,offer_idx:7,vault_address:'v',orderbook_address:'b',user_address:'wallet1',order_type:'buyYT',price_implied_apy:86177,
@@ -28,11 +28,9 @@ assert.equal(buyYtEstimate(order,{...market,syExchangeRate:null},now),null);
 assert.equal(buyYtEstimate(order,market,market.maturityDateUnixTs+1),null);
 for(const change of [{is_removed:true},{amount_remaining:0},{expiry_at:new Date(now*1000).toISOString()},{order_type:'sellYT'},{order_type:'buyPT'},{vault_address:'other'},{orderbook_address:'other'}])
  assert.equal(buyOpenOrders([{...order,...change}],market,now).length,0);
-const marker={signature:'sig',book:'b',vault:'v',id:7,owner:'wallet1',price:86177,ts:created,expirySeconds:expiry-created};
-assert.equal(buyMarkedOrder(order,[marker]),marker);assert.equal(buyMarkedOrder({...order,tx_signature:'reused'},[marker]),undefined);
-const groups=buyGroups([{...order,offer_idx:3,user_address:'wallet2'},order,{...order,id:101,offer_idx:8,price_implied_apy:86178}],market,new Map([['b',snapshot]]),now,[marker]);
+const groups=buyGroups([{...order,offer_idx:3,user_address:'wallet2'},order,{...order,id:101,offer_idx:8,price_implied_apy:86178}],market,new Map([['b',snapshot]]),now);
 assert.equal(groups.length,1);assert.equal(groups[0].rows.length,3);assert.equal(groups[0].apy,9);
 assert.equal(groups[0].rows[0].position,null);assert.equal(groups[0].rows[1].position.index,1);assert.equal(groups[0].rows[2].position.index,2);
 assert.equal(groups[0].rows[0].apy.toFixed(2),groups[0].rows[1].apy.toFixed(2));
 assert.equal(buyGroups([{...order,amount_remaining:'9007199254740992'}],market,new Map(),now)[0].unknown,true);
-console.log('PASS: buy-side types, YT estimates, price buckets, independent exact-price queues, partial fills, ID reuse, markers, expiry, cancellation and stale data');
+console.log('PASS: buy-side types, YT estimates, price buckets, independent exact-price queues, partial fills, ID reuse, expiry, cancellation and stale data');

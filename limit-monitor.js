@@ -1,4 +1,4 @@
-// Queue selection deliberately remains disabled until the on-chain decoder is validated.
+// Independent gap and reward-range alarm edges, sharing one latched audio loop.
 const limitState = { records: {}, edges: new Map(), enabled: false, storageError: false };
 const LIMIT_STORAGE = 'exponent-limit-monitor-v2';
 let limitAudio = null;
@@ -142,6 +142,7 @@ function renderLimitCells(row, assetKey, market) {
         record[field] = input.value;
         limitState.records[row.limitKey] = record;
         limitState.edges.delete(row.limitKey); // Recheck edited settings on the next successful APY fetch.
+        limitState.edges.delete(row.limitKey + ':range');
         saveLimits(); renderApy();
       });
       const cell = cells[index === 0 ? 0 : 2];
@@ -169,7 +170,7 @@ function renderLimitCells(row, assetKey, market) {
     input.disabled = !key;
     const invalid = input.value !== '' && limitNumber(input.value) === null;
     input.setAttribute('aria-invalid', String(invalid));
-    input.limitError.textContent = invalid ? `${index ? 'Threshold' : 'APY'} must be nonnegative (e.g. 0.10). Alarm disabled.` : '';
+    input.limitError.textContent = invalid ? `${index ? 'Threshold' : 'APY'} must be nonnegative (e.g. 0.10). ${index ? 'Gap alarm disabled.' : 'Alarm disabled.'}` : '';
   });
   const apy = limitNumber(record.apy);
   const gap = market && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100) && apy !== null
@@ -185,19 +186,25 @@ function evaluateLimitAlerts() {
     if (!market) continue;
     const key = limitKey(market), record = limitState.records[key] || {};
     const apy = limitNumber(record.apy), threshold = limitNumber(record.threshold);
-    if (apy === null || threshold === null || typeof market.impliedApy !== 'number' || !Number.isFinite(market.impliedApy * 100)) {
-      limitState.edges.delete(key); continue;
+    if (apy === null) { limitState.edges.delete(key); limitState.edges.delete(key + ':range'); continue; }
+    const reasons = [];
+    function check(edgeKey, triggered, reason) {
+      if (triggered === null) return; // Unknown/stale data cannot re-arm a condition.
+      const previous = limitState.edges.get(edgeKey);
+      limitState.edges.set(edgeKey, triggered);
+      if (triggered && previous !== true) reasons.push(reason);
     }
-    const gap = market.impliedApy * 100 - apy;
-    const triggered = limitGapAtOrBelow(market.impliedApy * 100, apy, threshold);
-    const previous = limitState.edges.get(key);
-    limitState.edges.set(key, triggered);
-    if (previous === true || !triggered || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
-    const message = `${asset.label}: gap ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} pp; threshold ${threshold} pp. Maturity ${apyDate(market.maturityDateUnixTs * 1000)}.`;
-    if (!limitAlarm.entries.has(key)) {
-      limitAlarm.entries.set(key, message);
-      messages.push(message);
-    }
+    if (threshold !== null && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100)) {
+      const gap = market.impliedApy * 100 - apy;
+      check(key, limitGapAtOrBelow(market.impliedApy * 100, apy, threshold), `gap ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} pp; threshold ${threshold} pp`);
+    } else limitState.edges.delete(key);
+    const range = typeof limitRewardRangeCheck === 'function' ? limitRewardRangeCheck(market, apy) : null;
+    check(key + ':range', range?.outside ?? null, `My Limit APY ${apy}% outside APY Range${range ? ' ' + range.label : ''}`);
+    if (!reasons.length || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
+    const message = `${asset.label}: ${reasons.join(' · ')}. Maturity ${apyDate(market.maturityDateUnixTs * 1000)}.`;
+    const existing = limitAlarm.entries.get(key);
+    if (!existing) { limitAlarm.entries.set(key, message); messages.push(message); }
+    else if (!existing.includes(message)) { limitAlarm.entries.set(key, existing + '\n' + message); renderLimitAlarm(); }
   }
   if (messages.length) {
     const body = messages.join('\n');
@@ -205,11 +212,13 @@ function evaluateLimitAlerts() {
     renderLimitAlarm();
     // Synchronous notification creation: no delayed callback can alert for a previous wallet.
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try { new Notification('APY Gap ≤ threshold', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
+      try { new Notification('APY Alarm', { body, tag: 'limit-apy', silent: true }); } catch { /* Inline alert remains available. */ }
     }
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
+  const alarmLabel = document.getElementById('limitAlerts')?.parentElement;
+  if (alarmLabel) alarmLabel.title = 'Gap ≤ Threshold OR My Limit APY outside APY Range. Alarm until stopped.';
   try {
     const current = localStorage.getItem(LIMIT_STORAGE);
     const saved = JSON.parse(current || '{}');

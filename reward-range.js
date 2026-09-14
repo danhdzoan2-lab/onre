@@ -33,6 +33,17 @@ function rewardPosition(band, manual) {
   if (value > band.high) return 'Above range';
   return 'Within range';
 }
+function limitRewardRangeCheck(market, manual) {
+  const state = rewardRangeState;
+  if (!Number.isFinite(manual) || state.error || !state.checkedAt || Date.now() - state.checkedAt > 8000 || !state.campaigns) return null;
+  const campaigns = rewardCandidates(state.campaigns, market, Date.now());
+  if (!campaigns?.length) return null;
+  const bands = campaigns.map(c => Number.isFinite(Date.parse(c.startsAt)) && Number.isFinite(Date.parse(c.endsAt)) && rewardBudget(c) === true ? rewardBand(c) : null);
+  // Membership is a union, never the envelope between disjoint campaigns.
+  if (bands.some(b => b && manual >= b.low && manual <= b.high)) return { outside: false, label: '' };
+  if (bands.some(b => !b)) return null;
+  return { outside: true, label: bands.map(b => `${b.low.toFixed(6)}%–${b.high.toFixed(6)}%`).join(' / ') };
+}
 function formatRewardsApy(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `${value.toFixed(2)}%` : '—';
 }
@@ -111,6 +122,7 @@ async function fetchRewardRanges() {
     const data = await response.json();
     if (!Array.isArray(data.campaigns) || data.campaigns.some(c => !c || typeof c !== 'object' || Array.isArray(c))) throw new Error('Invalid range data');
     state.campaigns = data.campaigns; state.checkedAt = Date.now(); state.error = ''; state.retryAt = 0;
+    if (typeof evaluateLimitAlerts === 'function') evaluateLimitAlerts();
   } catch (error) {
     state.error = error.name === 'AbortError' ? 'Range request timed out' : error.message;
   } finally {

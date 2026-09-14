@@ -27,9 +27,9 @@ function buyOpenOrders(orders,market,now) {
 }
 function buyQueuePosition(order,market,snapshot,now) {
   if(!snapshot?.book||snapshot.error||Date.now()-snapshot.checkedAt>12000)return null;
-  const b=snapshot.book,raw=order.price_implied_apy,created=Date.parse(order.created_at)/1000,expiry=Date.parse(order.expiry_at)/1000;
+  const b=snapshot.book,raw=order.price_implied_apy,created=order._chainCreated??Date.parse(order.created_at)/1000,expiry=order._chainExpiry??Date.parse(order.expiry_at)/1000;
   if(b.vault!==market.vaultAddress||b.maturity!==market.maturityDateUnixTs||b.priceDecimals!==6||!Number.isInteger(raw)
-    ||!Number.isInteger(created)||expiry!==created+order.expiry_seconds||expiry<=now)return null;
+    ||!Number.isInteger(created)||expiry!==Math.min(created+order.expiry_seconds,b.maturity)||expiry<=now)return null;
   const original=buyRawAmount(order.original_amount),remaining=buyRawAmount(order.amount_remaining);
   if(original===null||remaining===null||remaining>original)return null;
   try{
@@ -110,7 +110,10 @@ if(typeof window!=='undefined'){
         try{return [address,await getOrderBookSnapshot(address)];}catch(e){return [address,{...orderRpcState.books.get(address),error:e.name==='AbortError'?'Orderbook timed out':e.message}];}
       }));
       if(view.identity!==identity)return;
-      view.orders=data;view.dataMarket=market;view.snapshots=new Map(results);view.checkedAt=Date.now();view.error=results.some(([,s])=>s.error)?'On-chain queue unavailable; positions unverified':'';
+      const snapshots=new Map(results);
+      const reconciled=typeof reconcileBuyOrders==='function'?await reconcileBuyOrders(data,market,snapshots):data;
+      if(view.identity!==identity)return;
+      view.orders=reconciled;view.dataMarket=market;view.snapshots=snapshots;view.checkedAt=Date.now();view.error=results.some(([,s])=>s.error)?'On-chain queue unavailable; positions unverified':'';
       view.retryAt=0;
     }catch(e){if(view.identity===identity){view.error=e.name==='AbortError'?'Orders request timed out':e.message;if(!view.retryAt)view.retryAt=Date.now()+5000;}}
     finally{clearTimeout(timer);view.busy=false;if(view.identity===identity)renderBuyMarket(view);}

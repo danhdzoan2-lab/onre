@@ -46,6 +46,27 @@ async function getPlacement(record) {
   if(indexes.length!==1)throw Error('Transaction position unavailable');
   return {slot:tx.slot,transactionIndex:indexes[0],outer:event.outer,inner:event.inner};
 }
+async function reconcileBuyOrders(orders,market,snapshots) {
+  const output=orders.map(({_chainCreated,_chainExpiry,...o})=>o);
+  // Indexed timestamps can differ from Solana's clock. Repair only when the
+  // finalized Post Offer identifies the current on-chain incarnation exactly.
+  for(let i=0;i<output.length;i+=3)await Promise.all(output.slice(i,i+3).map(async o=>{
+    if(o.order_type!=='buyYT'||buyQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
+    const snapshot=snapshots.get(o.orderbook_address),book=snapshot?.book;
+    if(!book||snapshot.error||book.vault!==market.vaultAddress||book.maturity!==market.maturityDateUnixTs)return;
+    const offer=book.offers.get(o.offer_idx),price=book.prices.find(p=>p.id===offer?.pricePointer)?.price;
+    if(!offer||offer.owner!==o.user_address||offer.side!==2||offer.virtual!==0||price!==o.price_implied_apy)return;
+    const record=orderWatchRecord(o,market,'proof');if(!record||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(record.signature))return;
+    try{
+      const tx=await placementRead('getTransaction',[record.signature,{encoding:'json',commitment:'finalized',maxSupportedTransactionVersion:0}]);
+      const event=placementEvent(record,tx);
+      if(!event||tx.blockTime!==offer.created||offer.expiry!==Math.min(offer.created+event.expirySeconds,book.maturity)
+        ||snapshot.slot<tx.slot||offer.amount!==BigInt(o.amount_remaining)||offer.amount>BigInt(event.amount))return;
+      o._chainCreated=offer.created;o._chainExpiry=offer.expiry;
+    }catch{ /* Leave unresolved identities unverified; never guess an offset. */ }
+  }));
+  return output;
+}
 function comparePlacements(a,b) {
   for(const key of ['slot','transactionIndex','outer','inner']){
     if(!Number.isSafeInteger(a?.[key])||!Number.isSafeInteger(b?.[key]))return null;

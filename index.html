@@ -234,7 +234,7 @@
       <p id="transactionRefreshStatus" role="status" aria-live="polite"></p>
     </div>
     <div class="notice-row">
-      <div class="warn-note">Transaction refresh only; APY alarms keep checking every 2s. <span id="volumeNote">High volume compares the largest signer token change in each transaction.</span></div>
+      <span id="volumeNote" hidden></span>
     </div></details>
     <div class="notice-row"><div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
@@ -256,6 +256,7 @@
         <button id="sronycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('sronyc')">srONyc</button>
         <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
         <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
+        <button id="srehyusdFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('srehyusd')">srEHYUSD</button>
       </div>
     </div>
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
@@ -311,7 +312,8 @@
     strcx: { label: 'STRCx', mint: STRCX_MINT },
     sronyc: { label: 'srONyc', mint: '9J8VvigcjFTkN3jhZH2ieTi2hdGVBVpEXbcA1JDo7QpA' },
     eusx: { label: 'eUSX', mint: '3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC' },
-    usx: { label: 'USX', mint: '6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG' }
+    usx: { label: 'USX', mint: '6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG' },
+    srehyusd: { label: 'srEHYUSD', mint: 'FvQP1fjox2GPSwkEhENuZisz8UeRURLWf7GYF9n2mURD' }
   };
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
   const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';

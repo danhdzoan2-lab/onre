@@ -113,24 +113,22 @@ function renderOrderWatches() {
   root.hidden=orderWatchState.records.size===0;
   const note=document.getElementById('orderWatchStatus');
   note.textContent=orderWatchState.storageError?'Watch storage unavailable; changes apply to this session only.':
-    !ORDER_WATCH_PRIORITY_VERIFIED?'Order priority alarms unavailable — real-fill verification pending.':
-    !limitState.enabled?'Order alarms paused. Turn on APY Alarm.':'';
+    '';
+  note.hidden=!note.textContent;
   const list=document.getElementById('orderWatchList');
   for(const [key,r] of orderWatchState.records){
     let node=orderWatchState.nodes.get(key);
     if(!node){
       node=document.createElement('div');node.className='order-watch-item';
-      const info=document.createElement('span'),state=document.createElement('span'),remove=document.createElement('button'),placement=document.createElement('span');
+      const info=document.createElement('span'),state=document.createElement('span'),remove=document.createElement('button');
       state.setAttribute('role','status');remove.type='button';remove.textContent='Unwatch';remove.addEventListener('click',()=>removeOrderWatch(key));
-      placement.className='book-hint order-placement';
-      node.append(info,state,remove,placement);node.info=info;node.state=state;node.placement=placement;list.appendChild(node);orderWatchState.nodes.set(key,node);
+      node.append(info,state,remove);node.info=info;node.state=state;list.appendChild(node);orderWatchState.nodes.set(key,node);
     }
     node.info.textContent=`${ASSETS[r.assetKey]?.label||r.assetKey} · #${r.offerId} · ${buyOrderApy(r.rawPrice).toFixed(2)}%`;
     node.info.title=`${r.owner} · ${r.book} · ${apyDate(r.maturity*1000)}`;
     const gp=r.groupPosition;
     node.state.textContent=gp?`Group ${gp.apy===null?'—':gp.apy.toFixed(2)+'%'}: ${gp.index} / ${gp.total}${gp.stale||Date.now()-gp.checkedAt>12000?' · Stale':''}`:(limitState.enabled?'Group position: Waiting for data':'Group position: Open market to load');
     node.state.title='Display position within the APY group, not verified execution priority. '+(r.detail||'');
-    node.placement.textContent=r.placementText||(limitState.enabled?'Placement: Checking':'On-chain tracking paused · APY Alarm is off');node.placement.title=r.placementDetail||'';
     node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key)));
   }
   for(const [key,node] of orderWatchState.nodes)if(!orderWatchState.records.has(key)){node.remove();orderWatchState.nodes.delete(key);}
@@ -140,38 +138,62 @@ async function pollOrderWatches() {
   orderWatchState.busy=true;
   const proxy=getProxy(),generation=limitAlarm.generation;
   const entries=[...orderWatchState.records.entries()];
-  const addresses=[...new Set(entries.filter(([,r])=>r.status!=='Inactive').map(([,r])=>r.book))];
-  const snapshots=new Map();
   try {
-    // Bounded parallel reads; getOrderBookSnapshot also deduplicates with the UI.
-    for(let i=0;i<addresses.length;i+=3)await Promise.all(addresses.slice(i,i+3).map(async address=>{
-      try{snapshots.set(address,await getOrderBookSnapshot(address));}
-      catch(e){snapshots.set(address,{error:e.message});}
-    }));
-    if(getProxy()!==proxy)return;
     const messages=[],alarmKeys=[];let changed=false;
+    const results=new Map();
     for(const [key,r] of entries){
-      if(orderWatchState.records.get(key)!==r||r.status==='Inactive')continue;
-      const snapshot=snapshots.get(r.book);
-      if(snapshot?.slot&&r.lastSlot&&snapshot.slot<r.lastSlot){r.status='Stale';r.detail='Older snapshot ignored.';continue;}
-      if(typeof updatePlacement==='function')await updatePlacement(r,snapshot);
+      if(orderWatchState.records.get(key)!==r)continue;
+      let result;
+      try{
+        const identity=JSON.stringify([r.vault,r.maturity]);
+        if(!results.has(identity))results.set(identity,await loadWatchedGroups(r));
+        result=watchedGroupResult(r,results.get(identity));
+      }catch(e){result={front:null,status:'Stale',detail:e.message};}
       if(orderWatchState.records.get(key)!==r||!limitState.enabled||getProxy()!==proxy)continue;
-      const result=inspectWatchedOrder(r,snapshot);
       r.status=result.status;r.detail=result.detail;
-      if(result.identityVerified&&!r.verified){r.verified=true;changed=true;}
-      if(snapshot?.slot)r.lastSlot=snapshot.slot;
+      if(result.position)r.groupPosition=result.position;
+      else if(r.groupPosition)r.groupPosition.stale=true;
       if(result.front===null)continue; // Unknown data never re-arms an acknowledged alert.
       if(result.front===false){if(r.front!==false||r.ack){r.front=false;r.ack=false;changed=true;}continue;}
       if(r.front!==true){r.front=true;r.ack=false;changed=true;}
       const alarmKey=orderWatchAlarmKey(key);
       if(!r.ack&&limitState.enabled&&generation===limitAlarm.generation&&!limitAlarm.entries.has(alarmKey)){
-        const message=`Watched order at front · ${ASSETS[r.assetKey]?.label||r.assetKey} #${r.offerId} · ${buyOrderApy(r.rawPrice).toFixed(2)}% · Maturity ${apyDate(r.maturity*1000)}.`;
+        const message=`Watched order first in APY group · ${ASSETS[r.assetKey]?.label||r.assetKey} #${r.offerId} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · Maturity ${apyDate(r.maturity*1000)}. Display position, not execution priority.`;
         limitAlarm.entries.set(alarmKey,message);messages.push(message);alarmKeys.push(alarmKey);
       }
     }
     if(changed)saveOrderWatches();
     if(messages.length){startLimitAlarmAudio();renderLimitAlarm();void notifyLimitAlarm(messages.join('\n'),()=>alarmKeys.every(key=>limitAlarm.entries.has(key)));}
   } finally {orderWatchState.busy=false;renderOrderWatches();}
+}
+async function loadWatchedGroups(r) {
+  if(apyState.error||Date.now()-apyState.checkedAt>12000)throw Error('Market data is stale');
+  const market=(apyState.markets||[]).find(m=>m.vaultAddress===r.vault&&m.maturityDateUnixTs===r.maturity);
+  if(!market||!market.orderbookAddresses?.includes(r.book))throw Error('Watched market unavailable');
+  const orders=await placementOpenOrders(r.vault),ordersAt=Date.now(),snapshots=new Map();
+  // Use exactly the same grouping and sorting as the table, including other
+  // books and virtual sellPT orders. A failed read must not reorder an alert.
+  for(const address of market.orderbookAddresses){
+    const snapshot=await getOrderBookSnapshot(address);
+    if(snapshot.error||Date.now()-snapshot.checkedAt>12000)throw Error('Orderbook data is stale');
+    snapshots.set(address,snapshot);
+  }
+  if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
+  const reconciled=await reconcileBuyOrders(orders,market,snapshots);
+  if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
+  return {market,groups:buyGroups(reconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
+}
+function watchedGroupResult(r,data) {
+  if(!data||Date.now()-data.checkedAt>12000)return {front:null,status:'Stale',detail:'Group data is stale'};
+  if(r.expiry<=Date.now()/1000||r.maturity<=Date.now()/1000)return {front:null,status:'Inactive',detail:'Order expired'};
+  for(const g of data.groups){
+    const index=g.rows.findIndex(({order})=>{const candidate=orderWatchRecord(order,data.market,r.assetKey);return candidate&&orderWatchKey(candidate)===orderWatchKey(r);});
+    if(index>=0&&Number.isFinite(g.apy)){
+      const hasQueueCompetition=g.rows.length>=2;
+      return {front:hasQueueCompetition&&index===0,status:index===0?(hasQueueCompetition?'First in group':'Only order in group'):'Behind in group',detail:hasQueueCompetition?'Display position only; not execution priority.':'No alarm: this APY group has only one open order.',position:{index:index+1,total:g.rows.length,apy:g.apy,checkedAt:data.checkedAt,stale:false}};
+    }
+  }
+  return {front:null,status:'Inactive',detail:'Watched order not present; no replacement followed'};
 }
 function initOrderWatches() {
   try {
@@ -188,5 +210,5 @@ function initOrderWatches() {
   });
   renderOrderWatches();void pollOrderWatches();setInterval(pollOrderWatches,2000);
 }
-if(typeof module!=='undefined')module.exports={orderWatchKey,orderWatchRecord,validOrderWatch,inspectWatchedOrder};
+if(typeof module!=='undefined')module.exports={orderWatchKey,orderWatchRecord,validOrderWatch,inspectWatchedOrder,watchedGroupResult};
 if(typeof window!=='undefined')window.addEventListener('load',initOrderWatches);

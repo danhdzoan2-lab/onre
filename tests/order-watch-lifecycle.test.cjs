@@ -19,19 +19,24 @@ function fixture(gate=false,initial=null){
     setInterval(){},buyOrderApy:raw=>100*Math.expm1(raw/1e6),apyDate:String,renderApy(){},escapeHtml:String,
     sound:()=>{sounds++;},notice:async(body,isRelevant)=>{if(!isRelevant||isRelevant())notices++;}});
   vm.runInContext(fs.readFileSync(path.join(root,'limit-monitor.js'),'utf8'),ctx);
-  // Test-only substitution exercises the future enabled path; shipped source gate stays false.
-  vm.runInContext(gate?production.replace('const ORDER_WATCH_PRIORITY_VERIFIED = false;','const ORDER_WATCH_PRIORITY_VERIFIED = true;'):production,ctx);
+  vm.runInContext(production,ctx);
   const run=s=>vm.runInContext(s,ctx);
   run('startLimitAlarmAudio=sound;notifyLimitAlarm=notice;');
   ctx.api=api;ctx.market=market;run("const record=orderWatchRecord(api,market,'sronyc');const key=orderWatchKey(record);");
+  ctx.loadGroups=async()=>{
+    const current=await ctx.getOrderBookSnapshot();if(current.error)throw Error('Offline');
+    const ahead=current.book.offers.get(1);
+    return {market,checkedAt:Date.now(),groups:[{apy:6.7,rows:[...(ahead?.amount>0n?[{order:{...api,offer_idx:1}}]:[]),{order:api},...(ctx.solo?[]:[{order:{...api,offer_idx:3}}])]}]};
+  };
+  run('loadWatchedGroups=loadGroups;');
   return {ctx,run,book,snapshot,el,load:()=>loaded(),save:()=>saved,sounds:()=>sounds,notices:()=>notices,reads:()=>reads};
 }
 (async()=>{
   const gated=fixture();gated.run('orderWatchState.records.set(key,record);limitState.enabled=true;');await gated.run('pollOrderWatches()');
-  assert.equal(gated.run('record.status'),'Unverified');assert.equal(gated.sounds(),0);assert.equal(gated.notices(),0);
+  assert.equal(gated.run('record.status'),'First in group');assert.equal(gated.sounds(),1);assert.equal(gated.notices(),1,'group alarm does not require execution-priority release gate');
   const f=fixture(true);f.run('orderWatchState.records.set(key,record);');await f.run('pollOrderWatches()');assert.equal(f.reads(),0,'OFF does not poll');
   f.run('limitState.enabled=true;');await f.run('pollOrderWatches()');
-  assert.equal(f.run('record.status'),'At front');assert.equal(f.sounds(),1);assert.equal(f.notices(),1,'filtered token is still watched');
+  assert.equal(f.run('record.status'),'First in group');assert.equal(f.sounds(),1);assert.equal(f.notices(),1,'filtered token is still watched');
   await f.run('pollOrderWatches()');assert.equal(f.notices(),1,'no duplicate notification');
   f.run('stopLimitAlarm()');assert.equal(f.run('record.ack'),true);await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
   const restored=fixture(true,f.save());restored.load();restored.run('limitState.enabled=true;');await restored.run('pollOrderWatches()');
@@ -39,8 +44,11 @@ function fixture(gate=false,initial=null){
   f.snapshot.error='offline';await f.run('pollOrderWatches()');assert.equal(f.run('record.status'),'Stale');delete f.snapshot.error;
   await f.run('pollOrderWatches()');assert.equal(f.notices(),1,'unknown never rearms');
   const ahead={...f.book.offers.get(2),id:1,next:2,owner:'someone else'};f.book.offers.set(1,ahead);f.book.prices[0].buyHead=1;
-  await f.run('pollOrderWatches()');assert.equal(f.run('record.status'),'Behind');assert.equal(f.run('record.ack'),false);
-  ahead.amount=0n;await f.run('pollOrderWatches()');assert.equal(f.notices(),2,'behind then front rearms');
+  await f.run('pollOrderWatches()');assert.equal(f.run('record.status'),'Behind in group');assert.equal(f.run('record.ack'),false);
+  ahead.amount=0n;await f.run('pollOrderWatches()');assert.equal(f.notices(),2,'behind then first rearms');
+  f.run('stopLimitAlarm()');f.ctx.solo=true;
+  await f.run('pollOrderWatches()');assert.equal(f.run('record.status'),'Only order in group');assert.equal(f.notices(),2,'1/1 does not alarm');
+  f.ctx.solo=false;await f.run('pollOrderWatches()');assert.equal(f.notices(),3,'1/1 becomes 1/2 and alarms');
   f.run("limitAlarm.entries.set('apy-gap','APY still active');removeOrderWatch(key);");
   assert.equal(f.run("limitAlarm.entries.has('apy-gap')"),true,'Unwatch does not stop other alarms');assert.equal(f.run('orderWatchState.records.size'),0);
   const race=fixture(true);race.run('orderWatchState.records.set(key,record);limitState.enabled=true;');

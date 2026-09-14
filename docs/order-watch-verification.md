@@ -35,6 +35,19 @@ it must display that priority alarms are unavailable while this gate is closed.
 
 ## Required before enabling
 
+Update 15 September 2026: the user explicitly selected a display-group alarm.
+It now triggers at Group Position 1/N only when N >= 2, independently of the
+execution-priority release gate. Stop acknowledges the current episode;
+1/1, or a later group position, re-arms it on fresh data. Unknown data does not.
+The earlier real-fill gate below still applies to claims about execution priority.
+
+API timestamp drift is now reconciled via a finalized Post Offer: exact owner,
+vault, book, ID, raw price, original amount and duration must match; transaction
+blockTime must equal the live offer creation time, expiry must match the duration
+clamped to market maturity, and snapshot slot/remaining amount must match.
+No blanket timestamp tolerance is used. The API watch identity remains unchanged.
+Live verification found Pgof #2 before #5 and kgtp #4 at raw price 64850.
+
 1. Record confirmed pre-trade book bytes/slot, a successful actual taker sell
    transaction, decoded ordered fill events and confirmed post-trade book.
 2. Compare fills against descending raw-price traversal and head/next order at

@@ -255,7 +255,7 @@ function evaluateLimitAlerts() {
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
   const alarmButton = document.getElementById('limitAlerts');
-  alarmButton.title = 'Gap ≤ Threshold, My Limit APY outside APY Range, or a verified watched order at front. Alarm until stopped.';
+  alarmButton.title = 'Gap ≤ Threshold, My Limit APY outside APY Range, or a watched order at Group Position 1 / N. Alarm until stopped.';
   try {
     const current = localStorage.getItem(LIMIT_STORAGE);
     const saved = JSON.parse(current || '{}');

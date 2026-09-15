@@ -58,7 +58,10 @@ renderOrderWatches=function(){
   }
   for(const [wallet,node] of walletMonitor.walletNodes)if(!walletMonitor.wallets.has(wallet)){node.remove();walletMonitor.walletNodes.delete(wallet);}
   const status=document.getElementById('orderWatchStatus');
-  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':walletMonitor.loading?'Loading orders…':walletMonitor.scanError||(!orderWatchState.records.size?'No open buy orders.':'');
+  // Background scans should not replace a stable list with a flashing
+  // "Loading orders" label. Only show an empty-state message before the
+  // first order is discovered; existing rows remain visible while refreshing.
+  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':walletMonitor.scanError||(!orderWatchState.records.size&&!walletMonitor.loading?'No open buy orders.':'');
   status.hidden=!status.textContent;
   const list=document.getElementById('orderWatchList');
   const records=[...orderWatchState.records].sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);

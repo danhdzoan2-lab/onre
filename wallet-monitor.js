@@ -63,7 +63,7 @@ renderOrderWatches=function(){
   // Background scans should not replace a stable list with a flashing
   // "Loading orders" label. Only show an empty-state message before the
   // first order is discovered; existing rows remain visible while refreshing.
-  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':walletMonitor.scanError||(!orderWatchState.records.size?'No open buy orders.':'');
+  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':(!orderWatchState.records.size&&!walletMonitor.scanError?'No open buy orders.':'');
   status.hidden=!status.textContent;
   const list=document.getElementById('orderWatchList');
   const records=[...orderWatchState.records].sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);
@@ -71,11 +71,11 @@ renderOrderWatches=function(){
   for(const [key,r] of records){
     let node=orderWatchState.nodes.get(key);
     if(!node){node=document.createElement('tr');node.cellsList=Array.from({length:6},()=>document.createElement('td'));node.append(...node.cellsList);orderWatchState.nodes.set(key,node);}
-    const p=r.groupPosition,stale=r.status==='Stale'||(p&&(p.stale||Date.now()-p.checkedAt>12000));
-    const yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+(stale?' *':''):'—';
-    const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}${stale?' · Stale':''}`:r.status||'Checking',buyOrderApy(r.rawPrice).toFixed(2)+'%',yt];
+    const p=r.groupPosition;
+    const yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+    const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}`:'—',buyOrderApy(r.rawPrice).toFixed(2)+'%',yt];
     node.cellsList.forEach((cell,i)=>{if(cell.textContent!==values[i])cell.textContent=values[i];});
-    node.cellsList[2].title=r.owner;node.cellsList[4].className='amount';node.cellsList[3].title=r.detail||'';node.cellsList[5].title=stale?'Stale data':'Estimated YT before fees';
+    node.cellsList[2].title=r.owner;node.cellsList[4].className='amount';node.cellsList[3].title='';node.cellsList[5].title='';
     node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key));
     if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);index++;
   }

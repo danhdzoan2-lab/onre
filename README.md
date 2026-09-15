@@ -16,6 +16,8 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 
 ### Automatic wallet buy-order monitoring
 
+My Limit APY now comes exclusively from live wallet buyYT orders matching the displayed vault/book/maturity. Distinct raw APYs appear with aligned gaps; the original manual APY remains stored but is not evaluated. Threshold stays editable per market. Each order has independent gap/range edges saved with its placement identity. Unknown/stale data cannot rearm alarms. Both order tables show Group Position before Order APY and Remaining YT, with order IDs retained internally only. Background wallet scans do not show a loading label.
+
 Add public Solana addresses under **Buy Orderbook**. Wallets are saved locally; no connection or signing is required. Manual Watch/Unwatch is replaced by automatic discovery of open buyYT orders across all unexpired Orderbook markets for ONyc, STRCx, srONyc, eUSX, USX and srEHYUSD, independent of filters and collapsed sections.
 
 Adding a wallet or reopening the page scans once. **Refresh orders** scans manually; **APY Alarm: ON** continues scanning every 2 seconds, including wallets with no orders yet. API and on-chain requests share a three-request concurrency limit and per-vault/book cache, with 8-second request timeouts and rate-limit backoff. Failed markets retain stale records; only successful responses remove missing orders without assuming fill/cancel.

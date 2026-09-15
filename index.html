@@ -252,11 +252,11 @@
       <div class="asset-filter-group" role="group" aria-label="Asset filter">
         <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
         <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('onyc')">ONyc</button>
-        <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('strcx')">STRCx</button>
         <button id="sronycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('sronyc')">srONyc</button>
         <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
         <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
         <button id="srehyusdFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('srehyusd')">srEHYUSD</button>
+        <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('strcx')">STRCx</button>
       </div>
     </div>
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
@@ -282,7 +282,7 @@
     </div>
     <div id="watchedBuyOrders" hidden>
       <p id="orderWatchStatus" class="book-status" role="status"></p>
-      <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Order ID</th><th>Order APY</th><th>Group Position</th></tr></thead><tbody id="orderWatchList" aria-label="Personal buy orders"></tbody></table></div>
+      <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Remaining YT</th></tr></thead><tbody id="orderWatchList" aria-label="Personal buy orders"></tbody></table></div>
     </div>
     <div id="buyBooks"></div>
   </section>
@@ -1010,6 +1010,7 @@
 <script src="order-placement.js"></script>
 <script src="order-watch.js"></script>
 <script src="wallet-monitor.js"></script>
+<script src="auto-limit.js"></script>
 <style>
  .book-market{border-top:1px solid var(--line)}
  .book-market>summary,.book-group>summary{cursor:pointer;line-height:1.4}

@@ -14,7 +14,7 @@ function walletMarkets(markets,now=Date.now()/1000){
 }
 saveOrderWatches=function(){
   try{
-    for(const [key,r] of orderWatchState.records)walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry});
+    for(const [key,r] of orderWatchState.records)walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry,limitEdges:r.limitEdges});
     for(const [key,r] of walletMonitor.history)if(!walletMonitor.wallets.has(r.owner)||r.expiry<Date.now()/1000)walletMonitor.history.delete(key);
     localStorage.setItem(WALLET_MONITOR_STORAGE,JSON.stringify({wallets:[...walletMonitor.wallets],history:[...walletMonitor.history]}));
     orderWatchState.storageError=false;
@@ -38,9 +38,11 @@ function removeMonitorWallet(wallet){
   walletMonitor.wallets.delete(wallet);walletMonitor.revision++;walletMonitor.error='';
   for(const [key,r] of orderWatchState.records)if(r.owner===wallet)orderWatchState.records.delete(key);
   for(const [key,owner] of walletMonitor.alarmOwners)if(owner===wallet){limitAlarm.entries.delete(key);walletMonitor.alarmOwners.delete(key);}
+  if(typeof removeAutoWalletAlarms==='function')removeAutoWalletAlarms(wallet);
   saveOrderWatches();
   if(!limitAlarm.entries.size)stopLimitAlarm();else renderLimitAlarm();
   renderOrderWatches();if(typeof renderBuyBooks==='function')renderBuyBooks();
+  if(typeof renderApy==='function')renderApy();
   if(walletMonitor.wallets.size){walletMonitor.pending=true;void pollOrderWatches(true);}
 }
 renderOrderWatches=function(){
@@ -61,7 +63,7 @@ renderOrderWatches=function(){
   // Background scans should not replace a stable list with a flashing
   // "Loading orders" label. Only show an empty-state message before the
   // first order is discovered; existing rows remain visible while refreshing.
-  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':walletMonitor.scanError||(!orderWatchState.records.size&&!walletMonitor.loading?'No open buy orders.':'');
+  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':walletMonitor.scanError||(!orderWatchState.records.size?'No open buy orders.':'');
   status.hidden=!status.textContent;
   const list=document.getElementById('orderWatchList');
   const records=[...orderWatchState.records].sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);
@@ -70,10 +72,11 @@ renderOrderWatches=function(){
     let node=orderWatchState.nodes.get(key);
     if(!node){node=document.createElement('tr');node.cellsList=Array.from({length:6},()=>document.createElement('td'));node.append(...node.cellsList);orderWatchState.nodes.set(key,node);}
     const p=r.groupPosition,stale=r.status==='Stale'||(p&&(p.stale||Date.now()-p.checkedAt>12000));
-    const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),'#'+r.offerId,buyOrderApy(r.rawPrice).toFixed(2)+'%',p?`${p.index} / ${p.total}${stale?' · Stale':''}`:r.status||'Checking'];
+    const yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+(stale?' *':''):'—';
+    const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}${stale?' · Stale':''}`:r.status||'Checking',buyOrderApy(r.rawPrice).toFixed(2)+'%',yt];
     node.cellsList.forEach((cell,i)=>{if(cell.textContent!==values[i])cell.textContent=values[i];});
-    node.cellsList[2].title=r.owner;node.cellsList[4].className='amount';node.cellsList[5].title=r.detail||'';
-    node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key)));
+    node.cellsList[2].title=r.owner;node.cellsList[4].className='amount';node.cellsList[3].title=r.detail||'';node.cellsList[5].title=stale?'Stale data':'Estimated YT before fees';
+    node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key));
     if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);index++;
   }
   for(const [key,node] of orderWatchState.nodes)if(!orderWatchState.records.has(key)){node.remove();orderWatchState.nodes.delete(key);}
@@ -81,7 +84,7 @@ renderOrderWatches=function(){
 async function scanWalletMarket(market,assetKey){
   const orders=await placementOpenOrders(market.vaultAddress),ordersAt=Date.now();
   const personal=buyOpenOrders(orders,market,ordersAt/1000).filter(o=>o.order_type==='buyYT'&&walletMonitor.wallets.has(o.user_address));
-  const records=personal.map(o=>orderWatchRecord(o,market,assetKey)).filter(Boolean);
+  const records=personal.map(o=>{const r=orderWatchRecord(o,market,assetKey);return r?{...r,remainingYt:buyYtEstimate(o,market,ordersAt/1000)}:null;}).filter(Boolean);
   if(!records.length)return {market,records,groups:[],checkedAt:ordersAt};
   try{
     const snapshots=new Map(await Promise.all(market.orderbookAddresses.map(async address=>[address,await getOrderBookSnapshot(address)])));
@@ -117,7 +120,8 @@ pollOrderWatches=async function(force=false){
           if(!walletMonitor.wallets.has(candidate.owner))continue;
           const key=orderWatchKey(candidate);live.add(key);
           let r=orderWatchState.records.get(key);
-          if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true};orderWatchState.records.set(key,r);}
+          if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true,limitEdges:saved?.limitEdges||{}};orderWatchState.records.set(key,r);}
+          r.remainingYt=candidate.remainingYt;r.checkedAt=data.checkedAt||0;
           const result=data.error?{front:null,status:'Stale',detail:data.error}:watchedGroupResult(r,data);
           r.status=result.status;r.detail=result.detail;
           if(result.position)r.groupPosition=result.position;else if(r.groupPosition)r.groupPosition.stale=true;
@@ -133,7 +137,7 @@ pollOrderWatches=async function(force=false){
         // Successful open-order response is authoritative for removals even
         // when the separate queue read failed. Latched alarms remain until Stop.
         for(const [key,r] of orderWatchState.records)if(r.vault===market.vaultAddress&&!live.has(key)){
-          walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry});orderWatchState.records.delete(key);
+          walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry,limitEdges:r.limitEdges});orderWatchState.records.delete(key);
         }
       }
     }
@@ -144,11 +148,13 @@ pollOrderWatches=async function(force=false){
       for(const a of pendingAlarms)if(walletMonitor.wallets.has(a.owner)&&orderWatchState.records.has(a.key)&&Date.now()-a.checkedAt<=12000&&!limitAlarm.entries.has(a.alarmKey)){
         limitAlarm.entries.set(a.alarmKey,a.message);walletMonitor.alarmOwners.set(a.alarmKey,a.owner);messages.push(a.message);alarmKeys.push(a.alarmKey);
       }
-      if(messages.length){startLimitAlarmAudio();renderLimitAlarm();void notifyLimitAlarm(messages.join('\n'),()=>alarmKeys.some(k=>limitAlarm.entries.has(k)));}
+      if(typeof evaluateAutoLimitAlerts==='function')messages.push(...evaluateAutoLimitAlerts(true));
+      if(messages.length){startLimitAlarmAudio();renderLimitAlarm();void notifyLimitAlarm(messages.join('\n'));}
     }
   }finally{
     orderWatchState.busy=false;walletMonitor.loading=false;renderOrderWatches();
     if(typeof renderBuyBooks==='function')renderBuyBooks();
+    if(typeof renderApy==='function')renderApy();
     if(walletMonitor.pending)void pollOrderWatches();
   }
 };
@@ -156,7 +162,7 @@ function initWalletMonitor(){
   try{
     const saved=JSON.parse(localStorage.getItem(WALLET_MONITOR_STORAGE)||'{}');
     for(const wallet of saved.wallets||[])if(validMonitorWallet(wallet))walletMonitor.wallets.add(wallet);
-    for(const entry of saved.history||[]){if(!Array.isArray(entry)||entry.length!==2)continue;const [key,r]=entry;if(typeof key==='string'&&r&&walletMonitor.wallets.has(r.owner)&&Number.isFinite(r.expiry))walletMonitor.history.set(key,{owner:r.owner,expiry:r.expiry,ack:r.ack===true,front:typeof r.front==='boolean'?r.front:null});}
+    for(const entry of saved.history||[]){if(!Array.isArray(entry)||entry.length!==2)continue;const [key,r]=entry;if(typeof key==='string'&&r&&walletMonitor.wallets.has(r.owner)&&Number.isFinite(r.expiry))walletMonitor.history.set(key,{owner:r.owner,expiry:r.expiry,ack:r.ack===true,front:typeof r.front==='boolean'?r.front:null,limitEdges:r.limitEdges&&typeof r.limitEdges==='object'?r.limitEdges:{}});}
   }catch{orderWatchState.storageError=true;}
   document.getElementById('walletForm').addEventListener('submit',event=>{event.preventDefault();const input=document.getElementById('walletAddress');if(addMonitorWallet(input.value))input.value='';});
   document.getElementById('refreshWalletOrders').addEventListener('click',()=>void pollOrderWatches(true));

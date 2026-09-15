@@ -88,7 +88,7 @@ function orderWatchButton(o,market,assetKey,stale) {
 function orderWatchRowAttributes(o,market,assetKey) {
   const r=orderWatchRecord(o,market,assetKey);if(!r)return '';
   const key=orderWatchKey(r);
-  return `data-watched="${orderWatchState.records.has(key)}" data-order-alarm="${limitAlarm.entries.has(orderWatchAlarmKey(key))}"`;
+  return `data-watched="${orderWatchState.records.has(key)}" data-order-alarm="${limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key)}"`;
 }
 function removeOrderWatch(key) {
   orderWatchState.records.delete(key);

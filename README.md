@@ -14,6 +14,18 @@ The tracker does not filter by PT market, token mint, instruction, or transactio
 
 ## Features
 
+### Automatic wallet buy-order monitoring
+
+Add public Solana addresses under **Buy Orderbook**. Wallets are saved locally; no connection or signing is required. Manual Watch/Unwatch is replaced by automatic discovery of open buyYT orders across all unexpired Orderbook markets for ONyc, STRCx, srONyc, eUSX, USX and srEHYUSD, independent of filters and collapsed sections.
+
+Adding a wallet or reopening the page scans once. **Refresh orders** scans manually; **APY Alarm: ON** continues scanning every 2 seconds, including wallets with no orders yet. API and on-chain requests share a three-request concurrency limit and per-vault/book cache, with 8-second request timeouts and rate-limit backoff. Failed markets retain stale records; only successful responses remove missing orders without assuming fill/cancel.
+
+Personal orders use the same APY-group ordering as Buy Orderbook, including sellPT competitors and the existing on-chain timestamp reconciliation. A fresh position **1 / N**, with **N >= 2**, latches the existing audio/visual/Windows alarm. Stop/Space acknowledges active alarms; acknowledgment is saved by complete placement identity. Removing a wallet clears only its alarms. Order-ID reuse is a new identity. Browser suspension or closure can interrupt monitoring.
+
+Legacy manual Watch storage is preserved but not loaded or imported. APY/threshold and transaction-refresh settings are unchanged. This section supersedes the historical wallet/queue notes below.
+
+Run `node --test tests/*.cjs` for the full regression suite.
+
 - Market Implied APY table reads the public Exponent `/api/markets` endpoint every 2 seconds (source cache: 30 seconds).
 - Matches underlying mint and selects the farthest active maturity; shared market APY is independent of the CLMM/Orderbook selector and follows the multi-token filter.
 - Displays Asia/Saigon maturity times, remaining time, and last successful check. Preserves stale data on failure and respects HTTP 429 Retry-After.

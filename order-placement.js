@@ -6,16 +6,21 @@ const placementMarkets=new Map();
 async function placementOpenOrders(vault) {
   let state=placementMarkets.get(vault);
   if(state&&Date.now()<state.retryAt)throw Error('Placement source is rate limited');
+  if(state?.flight)return state.flight;
   if(state&&Date.now()-state.checkedAt<2000)return state.orders;
   if(!state){state={checkedAt:0,retryAt:0};placementMarkets.set(vault,state);}
+  const flight=withBookRequest(async()=>{
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
   try{
     const response=await fetch(`https://app.exponent.finance/api/open-orders/vault/${encodeURIComponent(vault)}`,{signal:controller.signal});
     if(response.status===429){state.retryAt=Date.now()+apyRetryDelay(response.headers.get('Retry-After'));throw Error('Placement source is rate limited');}
     if(!response.ok)throw Error('Open orders unavailable');
-    const orders=await response.json();if(!Array.isArray(orders))throw Error('Invalid open orders');
+    const orders=await response.json();if(!Array.isArray(orders)||orders.some(o=>!o||typeof o!=='object'||Array.isArray(o)))throw Error('Invalid open orders');
     state.orders=orders;state.checkedAt=Date.now();return orders;
-  }finally{clearTimeout(timer);}
+  }catch(e){if(!state.retryAt||state.retryAt<Date.now())state.retryAt=Date.now()+5000;throw e;}
+  finally{clearTimeout(timer);}
+  }).finally(()=>{state.flight=null;});
+  state.flight=flight;return flight;
 }
 async function placementRead(method,params) {
   const key=JSON.stringify([getProxy(),method,params]);

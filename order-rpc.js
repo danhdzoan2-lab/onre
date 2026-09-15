@@ -1,7 +1,17 @@
 /* On-demand, read-only snapshots for expanded Buy Orderbook markets. */
 'use strict';
 const orderRpcState={books:new Map(),flights:new Map(),retryAt:0};
+const bookRequests={active:0,waiting:[]};
+async function withBookRequest(task){
+  if(bookRequests.active>=3)await new Promise(resolve=>bookRequests.waiting.push(resolve));
+  else bookRequests.active++;
+  try{return await task();}
+  finally{const next=bookRequests.waiting.shift();if(next)next();else bookRequests.active--;}
+}
 async function orderRpc(method,params){
+  return withBookRequest(()=>performOrderRpc(method,params));
+}
+async function performOrderRpc(method,params){
   if(!['getAccountInfo','getBlockTime','getTransaction','getBlock'].includes(method))throw Error('Unsupported read-only book request');
   if(Date.now()<orderRpcState.retryAt)throw Error('Orderbook rate limited; waiting to retry');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);

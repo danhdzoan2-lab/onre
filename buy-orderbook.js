@@ -99,12 +99,8 @@ if(typeof window!=='undefined'){
   async function refreshBuyMarket(view){
     if(!view.details.open||view.details.hidden||view.busy||Date.now()<view.retryAt||!view.market)return;
     view.busy=true;const market=view.market,identity=view.identity;
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
     try{
-      const response=await fetch(`https://app.exponent.finance/api/open-orders/vault/${encodeURIComponent(market.vaultAddress)}`,{signal:controller.signal});
-      if(response.status===429){view.retryAt=Date.now()+apyRetryDelay(response.headers.get('Retry-After'));throw Error('Rate limited; waiting to retry');}
-      if(!response.ok)throw Error(`Unable to load orders (${response.status})`);
-      const data=await response.json();if(!Array.isArray(data)||data.some(o=>!o||typeof o!=='object'||Array.isArray(o)))throw Error('Invalid open-order data');
+      const data=await placementOpenOrders(market.vaultAddress);
       // Wait for every book, even when one fails, so the next poll never overlaps.
       const results=await Promise.all((market.orderbookAddresses||[]).map(async address=>{
         try{return [address,await getOrderBookSnapshot(address)];}catch(e){return [address,{...orderRpcState.books.get(address),error:e.name==='AbortError'?'Orderbook timed out':e.message}];}
@@ -116,7 +112,7 @@ if(typeof window!=='undefined'){
       view.orders=reconciled;view.dataMarket=market;view.snapshots=snapshots;view.checkedAt=Date.now();view.error=results.some(([,s])=>s.error)?'On-chain queue unavailable; positions unverified':'';
       view.retryAt=0;
     }catch(e){if(view.identity===identity){view.error=e.name==='AbortError'?'Orders request timed out':e.message;if(!view.retryAt)view.retryAt=Date.now()+5000;}}
-    finally{clearTimeout(timer);view.busy=false;if(view.identity===identity)renderBuyMarket(view);}
+    finally{view.busy=false;if(view.identity===identity)renderBuyMarket(view);}
   }
   function renderBuyBooks(){
     const root=document.getElementById('buyBooks');if(!root)return;

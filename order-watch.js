@@ -73,6 +73,7 @@ function orderWatchAlarmKey(key) { return 'order-watch:'+key; }
 function updateWatchGroupPosition(order,market,assetKey,position) {
   const record=orderWatchRecord(order,market,assetKey);if(!record)return;
   const watched=orderWatchState.records.get(orderWatchKey(record));if(!watched)return;
+  if(watched.groupPosition?.checkedAt>position.checkedAt)return;
   watched.groupPosition=position;
   renderOrderWatches();
 }
@@ -82,10 +83,7 @@ function acknowledgeOrderWatches() {
   if(changed)saveOrderWatches();
 }
 function orderWatchButton(o,market,assetKey,stale) {
-  const r=orderWatchRecord(o,market,assetKey);if(!r)return '';
-  const key=orderWatchKey(r),watched=orderWatchState.records.has(key);
-  orderWatchState.candidates.set(key,{record:r,checkedAt:Date.now(),stale});
-  return `<button type="button" class="order-watch-button" data-order-watch="${escapeHtml(key)}" aria-pressed="${watched}" ${stale&&!watched?'disabled':''}>${watched?'Unwatch':'Watch'}</button>`;
+  return '';
 }
 function orderWatchRowAttributes(o,market,assetKey) {
   const r=orderWatchRecord(o,market,assetKey);if(!r)return '';
@@ -196,19 +194,7 @@ function watchedGroupResult(r,data) {
   return {front:null,status:'Inactive',detail:'Watched order not present; no replacement followed'};
 }
 function initOrderWatches() {
-  try {
-    const saved=JSON.parse(localStorage.getItem(ORDER_WATCH_STORAGE)||'{}');
-    for(const r of Array.isArray(saved.records)?saved.records:[]){
-      if(!validOrderWatch(r)||!Object.hasOwn(ASSETS,r.assetKey))continue;
-      orderWatchState.records.set(orderWatchKey(r),{...r,verified:r.verified===true,front:typeof r.front==='boolean'?r.front:null,
-        ack:r.ack===true,status:'Checking',detail:'Restored watch; resynchronizing.',lastSlot:0,placementText:'',placementDetail:'',groupPosition:null});
-    }
-  } catch {orderWatchState.storageError=true;}
-  document.getElementById('buyBooks').addEventListener('click',event=>{
-    const button=event.target.closest?.('button[data-order-watch]');
-    if(button&&!button.disabled)toggleOrderWatch(button.dataset.orderWatch);
-  });
-  renderOrderWatches();void pollOrderWatches();setInterval(pollOrderWatches,2000);
+  initWalletMonitor();
 }
 if(typeof module!=='undefined')module.exports={orderWatchKey,orderWatchRecord,validOrderWatch,inspectWatchedOrder,watchedGroupResult};
 if(typeof window!=='undefined')window.addEventListener('load',initOrderWatches);

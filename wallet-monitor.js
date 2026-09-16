@@ -1,7 +1,7 @@
 /* Device-local wallets. Never import legacy manually watched owners. */
 'use strict';
 const WALLET_MONITOR_STORAGE='exponent-wallet-orders-v1';
-const walletMonitor={wallets:new Set(),revision:0,pending:false,error:'',alarmOwners:new Map(),history:new Map(),walletNodes:new Map()};
+const walletMonitor={wallets:new Set(),revision:0,pending:false,error:'',alarmOwners:new Map(),history:new Map(),walletNodes:new Map(),sellNodes:new Map()};
 function validMonitorWallet(value){
   try{return typeof value==='string'&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)&&ExponentBook.unbase58(value).length===32;}catch{return false;}
 }
@@ -42,17 +42,24 @@ function removeMonitorWallet(wallet){
   saveOrderWatches();
   if(!limitAlarm.entries.size)stopLimitAlarm();else renderLimitAlarm();
   renderOrderWatches();if(typeof renderBuyBooks==='function')renderBuyBooks();
+  if(typeof renderSellBooks==='function')renderSellBooks();
   if(typeof renderApy==='function')renderApy();
   if(walletMonitor.wallets.size){walletMonitor.pending=true;void pollOrderWatches(true);}
 }
 renderOrderWatches=function(){
   const dot=document.getElementById('bookDataHealth');
   if(dot){
-    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&(!walletMonitor.wallets.size||!!walletMonitor.checkedAt&&Date.now()-walletMonitor.checkedAt<=12000)&&!(typeof window!=='undefined'&&window.buyBookHealth&&[...window.buyBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
+    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].filter(r=>(r.orderSide||'buy')==='buy').every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&(!walletMonitor.wallets.size||!!walletMonitor.checkedAt&&Date.now()-walletMonitor.checkedAt<=12000)&&!(typeof window!=='undefined'&&window.buyBookHealth&&[...window.buyBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
     dot.dataset.fresh=String(fresh);dot.title=fresh?'Data up to date':'Data unavailable or outdated';dot.setAttribute('aria-label',dot.title);
   }
+  const sellDot=document.getElementById('sellBookDataHealth');
+  if(sellDot){
+    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].filter(r=>r.orderSide==='sell').every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&!(window.sellBookHealth&&[...window.sellBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
+    sellDot.dataset.fresh=String(fresh);sellDot.title=fresh?'Data up to date':'Data unavailable or outdated';sellDot.setAttribute('aria-label',sellDot.title);
+  }
   const root=document.getElementById('watchedBuyOrders');if(!root)return;
-  root.hidden=!walletMonitor.wallets.size;
+  const buyRecords=[...orderWatchState.records].filter(([,r])=>(r.orderSide||'buy')==='buy');
+  root.hidden=!buyRecords.length;
   const error=document.getElementById('walletError');
   error.textContent=walletMonitor.error;error.hidden=!error.textContent;
   const wallets=document.getElementById('walletList');
@@ -68,10 +75,10 @@ renderOrderWatches=function(){
   // Background scans should not replace a stable list with a flashing
   // "Loading orders" label. Only show an empty-state message before the
   // first order is discovered; existing rows remain visible while refreshing.
-  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':(!orderWatchState.records.size&&!walletMonitor.scanError?'No open buy orders.':'');
+  status.textContent=orderWatchState.storageError?'Browser storage unavailable.':'';
   status.hidden=!status.textContent;
   const list=document.getElementById('orderWatchList');
-  const records=[...orderWatchState.records].sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);
+  const records=buyRecords.sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);
   let index=0;
   for(const [key,r] of records){
     let node=orderWatchState.nodes.get(key);
@@ -86,17 +93,33 @@ renderOrderWatches=function(){
     if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);index++;
   }
   for(const [key,node] of orderWatchState.nodes)if(!orderWatchState.records.has(key)){node.remove();orderWatchState.nodes.delete(key);}
+  renderPersonalSellOrders();
 };
+function renderPersonalSellOrders(){
+  const root=document.getElementById('watchedSellOrders'),list=document.getElementById('sellOrderWatchList');if(!root||!list)return;
+  const records=[...orderWatchState.records].filter(([,r])=>r.orderSide==='sell').sort(([,a],[,b])=>a.assetKey.localeCompare(b.assetKey)||a.maturity-b.maturity||a.owner.localeCompare(b.owner)||a.offerId-b.offerId);
+  root.hidden=!records.length;let index=0;
+  for(const [key,r] of records){
+    let node=walletMonitor.sellNodes.get(key);
+    if(!node){node=document.createElement('tr');node.cellsList=Array.from({length:6},()=>document.createElement('td'));node.append(...node.cellsList);node.tabIndex=0;node.title='Open this order in Sell Orderbook';const open=()=>window.openPersonalSellOrder?.(key);node.addEventListener('click',open);node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();open();}});walletMonitor.sellNodes.set(key,node);}
+    const p=r.groupPosition,yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+    const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}`:'—',buyOrderApy(r.rawPrice).toFixed(2)+'%',yt];
+    node.cellsList.forEach((cell,i)=>cell.textContent=values[i]);node.cellsList[2].title=r.owner;node.cellsList[3].className=p?.index===1&&p.total>=2?'position-first':p?.index===2?'position-next':'';node.cellsList[4].className='amount';node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key));
+    if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);index++;
+  }
+  for(const [key,node] of walletMonitor.sellNodes)if(!orderWatchState.records.has(key)){node.remove();walletMonitor.sellNodes.delete(key);}
+}
 async function scanWalletMarket(market,assetKey){
   const orders=await placementOpenOrders(market.vaultAddress),ordersAt=Date.now();
-  const personal=buyOpenOrders(orders,market,ordersAt/1000).filter(o=>o.order_type==='buyYT'&&walletMonitor.wallets.has(o.user_address));
-  const records=personal.map(o=>{const r=orderWatchRecord(o,market,assetKey);return r?{...r,remainingYt:buyYtEstimate(o,market,ordersAt/1000)}:null;}).filter(Boolean);
-  if(!records.length)return {market,records,groups:[],checkedAt:ordersAt};
+  const buys=buyOpenOrders(orders,market,ordersAt/1000).filter(o=>o.order_type==='buyYT'&&walletMonitor.wallets.has(o.user_address));
+  const sells=sellOpenOrders(orders,market,ordersAt/1000).filter(o=>o.order_type==='sellYT'&&walletMonitor.wallets.has(o.user_address));
+  const records=[...buys.map(o=>{const r=orderWatchRecord(o,market,assetKey,'buy');return r?{...r,remainingYt:buyYtEstimate(o,market,ordersAt/1000)}:null;}),...sells.map(o=>{const r=orderWatchRecord(o,market,assetKey,'sell');return r?{...r,remainingYt:sellYtEstimate(o,market)}:null;})].filter(Boolean);
+  if(!records.length)return {market,records,groups:[],sellGroups:[],checkedAt:ordersAt};
   try{
     const snapshots=new Map(await Promise.all(market.orderbookAddresses.map(async address=>[address,await getOrderBookSnapshot(address)])));
-    const reconciled=await reconcileBuyOrders(orders,market,snapshots);
+    const buyReconciled=await reconcileBuyOrders(orders,market,snapshots),sellReconciled=await reconcileSellOrders(orders,market,snapshots);
     if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>s.error||Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
-    return {market,records,groups:buyGroups(reconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
+    return {market,records,groups:buyGroups(buyReconciled,market,snapshots,Date.now()/1000),sellGroups:sellGroups(sellReconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
   }catch(e){return {market,records,error:e.message};}
 }
 pollOrderWatches=async function(force=false){
@@ -128,7 +151,8 @@ pollOrderWatches=async function(force=false){
           let r=orderWatchState.records.get(key);
           if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true,limitEdges:saved?.limitEdges||{}};orderWatchState.records.set(key,r);}
           r.remainingYt=candidate.remainingYt;r.checkedAt=data.checkedAt||0;
-          const result=data.error?{front:null,status:'Stale',detail:data.error}:watchedGroupResult(r,data);
+          const groupData=r.orderSide==='sell'?{...data,groups:data.sellGroups||[]}:data;
+          const result=data.error?{front:null,status:'Stale',detail:data.error}:watchedGroupResult(r,groupData);
           r.status=result.status;r.detail=result.detail;
           if(result.position)r.groupPosition=result.position;else if(r.groupPosition)r.groupPosition.stale=true;
           if(!limitState.enabled||generation!==limitAlarm.generation||result.front===null)continue;
@@ -136,7 +160,7 @@ pollOrderWatches=async function(force=false){
           if(r.front!==true){r.front=true;r.ack=false;}
           const alarmKey=orderWatchAlarmKey(key);
           if(!r.ack&&!limitAlarm.entries.has(alarmKey)){
-            const message=`${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · ${apyDate(r.maturity*1000)}`;
+            const message=`${r.orderSide==='sell'?'Sell':'Buy'} · ${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · ${apyDate(r.maturity*1000)}`;
             pendingAlarms.push({alarmKey,message,owner:r.owner,key,checkedAt:result.position.checkedAt});
           }
         }
@@ -161,6 +185,7 @@ pollOrderWatches=async function(force=false){
   }finally{
     orderWatchState.busy=false;walletMonitor.loading=false;renderOrderWatches();
     if(typeof renderBuyBooks==='function')renderBuyBooks();
+    if(typeof renderSellBooks==='function')renderSellBooks();
     if(typeof renderApy==='function')renderApy();
     if(walletMonitor.pending)void pollOrderWatches();
   }

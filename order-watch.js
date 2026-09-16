@@ -7,15 +7,17 @@ const ORDER_WATCH_PRIORITY_VERIFIED = false;
 const ORDER_WATCH_STORAGE = 'exponent-watched-buy-orders-v1';
 const orderWatchState = { records: new Map(), candidates: new Map(), nodes: new Map(), busy: false, storageError: false };
 function orderWatchKey(r) {
-  return JSON.stringify([r.book,r.vault,r.maturity,r.owner,r.offerId,r.rawPrice,r.created,r.expiry,r.original,r.signature]);
+  const identity=[r.book,r.vault,r.maturity,r.owner,r.offerId,r.rawPrice,r.created,r.expiry,r.original,r.signature];
+  return JSON.stringify(r.orderSide==='sell'?['sell',...identity]:identity);
 }
-function orderWatchRecord(o, market, assetKey) {
+function orderWatchRecord(o, market, assetKey, orderSide='buy') {
   if(typeof o.original_amount==='number'&&!Number.isSafeInteger(o.original_amount))return null;
   const r = {assetKey,book:o.orderbook_address,vault:o.vault_address,maturity:market.maturityDateUnixTs,
     owner:o.user_address,offerId:o.offer_idx,rawPrice:o.price_implied_apy,created:Date.parse(o.created_at)/1000,
     expiry:Date.parse(o.expiry_at)/1000,original:String(o.original_amount),signature:o.tx_signature || '',
-    verified:false,front:null,ack:false,status:'Checking',detail:'Waiting for a fresh on-chain snapshot.'};
-  if(o.order_type!=='buyYT'||!market.orderbookAddresses?.includes(r.book)||r.vault!==market.vaultAddress
+    orderSide,orderType:o.order_type,verified:false,front:null,ack:false,status:'Checking',detail:'Waiting for a fresh on-chain snapshot.'};
+  const expected=orderSide==='sell'?'sellYT':'buyYT';
+  if(o.order_type!==expected||!market.orderbookAddresses?.includes(r.book)||r.vault!==market.vaultAddress
     ||r.expiry!==r.created+o.expiry_seconds||!validOrderWatch(r))return null;
   return r;
 }
@@ -70,8 +72,8 @@ function saveOrderWatches() {
   } catch { orderWatchState.storageError=true; }
 }
 function orderWatchAlarmKey(key) { return 'order-watch:'+key; }
-function updateWatchGroupPosition(order,market,assetKey,position) {
-  const record=orderWatchRecord(order,market,assetKey);if(!record)return;
+function updateWatchGroupPosition(order,market,assetKey,position,orderSide='buy') {
+  const record=orderWatchRecord(order,market,assetKey,orderSide);if(!record)return;
   const watched=orderWatchState.records.get(orderWatchKey(record));if(!watched)return;
   if(watched.groupPosition?.checkedAt>position.checkedAt)return;
   watched.groupPosition=position;
@@ -177,15 +179,15 @@ async function loadWatchedGroups(r) {
     snapshots.set(address,snapshot);
   }
   if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
-  const reconciled=await reconcileBuyOrders(orders,market,snapshots);
+  const reconciled=r.orderSide==='sell'?await reconcileSellOrders(orders,market,snapshots):await reconcileBuyOrders(orders,market,snapshots);
   if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
-  return {market,groups:buyGroups(reconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
+  return {market,groups:r.orderSide==='sell'?sellGroups(reconciled,market,snapshots,Date.now()/1000):buyGroups(reconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
 }
 function watchedGroupResult(r,data) {
   if(!data||Date.now()-data.checkedAt>12000)return {front:null,status:'Stale',detail:'Group data is stale'};
   if(r.expiry<=Date.now()/1000||r.maturity<=Date.now()/1000)return {front:null,status:'Inactive',detail:'Order expired'};
   for(const g of data.groups){
-    const index=g.rows.findIndex(({order})=>{const candidate=orderWatchRecord(order,data.market,r.assetKey);return candidate&&orderWatchKey(candidate)===orderWatchKey(r);});
+    const index=g.rows.findIndex(({order})=>{const candidate=orderWatchRecord(order,data.market,r.assetKey,r.orderSide||'buy');return candidate&&orderWatchKey(candidate)===orderWatchKey(r);});
     if(index>=0&&Number.isFinite(g.apy)){
       const hasQueueCompetition=g.rows.length>=2;
       return {front:hasQueueCompetition&&index===0,status:index===0?(hasQueueCompetition?'First in group':'Only order in group'):'Behind in group',detail:hasQueueCompetition?'Display position only; not execution priority.':'No alarm: this APY group has only one open order.',position:{index:index+1,total:g.rows.length,apy:g.apy,checkedAt:data.checkedAt,stale:false}};

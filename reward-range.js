@@ -13,11 +13,11 @@ function rewardBudget(c) {
   if (!/^\d+$/.test(c.fundingAmountRaw || '') || !/^\d+$/.test(c.distributedRaw || '')) return null;
   return BigInt(c.fundingAmountRaw) > BigInt(c.distributedRaw);
 }
-function rewardCandidates(campaigns, market, now) {
+function rewardCandidates(campaigns, market, now, orderType='buyYT') {
   if (!market || !Array.isArray(market.orderbookAddresses)) return null;
   return campaigns.filter(c => c.vaultAddress === market.vaultAddress
     && market.orderbookAddresses.includes(c.orderbookAddress)
-    && c.campaignType === 'orderbook_quote' && Array.isArray(c.incentivizedOrderTypes) && c.incentivizedOrderTypes.includes('buyYT')
+    && c.campaignType === 'orderbook_quote' && Array.isArray(c.incentivizedOrderTypes) && c.incentivizedOrderTypes.includes(orderType)
     && c.isActive !== false)
     .filter(c => {
       const start = Date.parse(c.startsAt), end = Date.parse(c.endsAt);
@@ -33,10 +33,10 @@ function rewardPosition(band, manual) {
   if (value > band.high) return 'Above range';
   return 'Within range';
 }
-function limitRewardRangeCheck(market, manual) {
+function limitRewardRangeCheck(market, manual, orderType='buyYT') {
   const state = rewardRangeState;
   if (!Number.isFinite(manual) || state.error || !state.checkedAt || Date.now() - state.checkedAt > 8000 || !state.campaigns) return null;
-  const campaigns = rewardCandidates(state.campaigns, market, Date.now());
+  const campaigns = rewardCandidates(state.campaigns, market, Date.now(), orderType);
   if (!campaigns?.length) return null;
   const bands = campaigns.map(c => Number.isFinite(Date.parse(c.startsAt)) && Number.isFinite(Date.parse(c.endsAt)) && rewardBudget(c) === true ? rewardBand(c) : null);
   // Membership is a union, never the envelope between disjoint campaigns.
@@ -72,11 +72,14 @@ function renderRewardRange(row, market, manual) {
   }
   const state = rewardRangeState;
   const stale = !!state.error || !state.checkedAt || Date.now() - state.checkedAt > 10000 || !!apyState.error;
-  const candidates = state.campaigns && rewardCandidates(state.campaigns, market, Date.now());
-  const entries = candidates?.map(c => {
+  const buyCandidates = state.campaigns && rewardCandidates(state.campaigns, market, Date.now(),'buyYT');
+  const sellCandidates = state.campaigns && rewardCandidates(state.campaigns, market, Date.now(),'sellYT');
+  const signature=list=>(list||[]).map(c=>c.id).join('|'),split=!!sellCandidates?.length&&signature(buyCandidates)!==signature(sellCandidates);
+  const candidates=split?[...(buyCandidates||[]).map(c=>({c,side:'Buy'})),...(sellCandidates||[]).map(c=>({c,side:'Sell'}))]:(buyCandidates||[]).map(c=>({c,side:''}));
+  const entries = candidates?.map(({c,side}) => {
     const band = rewardBand(c);
     const complete = Number.isFinite(Date.parse(c.startsAt)) && Number.isFinite(Date.parse(c.endsAt)) && rewardBudget(c) === true;
-    return { id: c.id, band: complete ? band : null, rewardsApy: complete ? formatRewardsApy(c.currentRewardsApy) : '—' };
+    return { id: c.id, side, band: complete ? band : null, rewardsApy: complete ? formatRewardsApy(c.currentRewardsApy) : '—' };
   });
   const model = JSON.stringify({ entries, stale, manual });
   if (row.rewardCell.dataset.model === model) return;
@@ -87,7 +90,7 @@ function renderRewardRange(row, market, manual) {
   if (!entries?.length) rewardsWrap.textContent = '—';
   else for (const entry of entries) {
     const item = document.createElement('div');
-    item.textContent = entry.rewardsApy + (stale && entry.rewardsApy !== '—' ? ' *' : '');
+    item.textContent = (entry.side?entry.side+' ':'')+entry.rewardsApy + (stale && entry.rewardsApy !== '—' ? ' *' : '');
     item.title = stale && entry.rewardsApy !== '—' ? 'Stale data' : '';
     rewardsWrap.appendChild(item);
   }
@@ -100,7 +103,7 @@ function renderRewardRange(row, market, manual) {
     if (!entry.band) item.textContent = '—';
     else {
       const {low, high} = entry.band;
-      item.textContent = formatInwardRange(low, high) + (stale ? ' *' : '');
+      item.textContent = (entry.side?entry.side+' ':'')+formatInwardRange(low, high) + (stale ? ' *' : '');
       item.title = `${stale ? 'Stale data · ' : ''}Rounded inward. Range may change; not confirmation of order rewards.`;
     }
     wrap.appendChild(item);

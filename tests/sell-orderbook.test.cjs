@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+global.ExponentBook={queue:(book,price,side)=>{assert.equal(side,1);return book.queue||[];}};
+const buy=require('../buy-orderbook');Object.assign(global,buy);
+const {sellYtEstimate,sellOpenOrders,sellQueuePosition,sellGroups}=require('../sell-orderbook');
+const now=2_000_000_000,market={vaultAddress:'vault',orderbookAddresses:['book'],maturityDateUnixTs:now+10000,decimals:6};
+const base={id:1,vault_address:'vault',orderbook_address:'book',user_address:'wallet',offer_idx:7,price_implied_apy:65000,order_type:'sellYT',is_removed:false,created_at:new Date((now-10)*1000).toISOString(),expiry_at:new Date((now+1000)*1000).toISOString(),expiry_seconds:1010,original_amount:'12000000',amount_remaining:'10000000'};
+assert.equal(sellYtEstimate(base,market),10);
+assert.equal(sellYtEstimate({...base,order_type:'buyPT'},market),10);
+assert.equal(sellOpenOrders([base,{...base,order_type:'buyPT'},{...base,order_type:'buyYT'}],market,now).length,2);
+const snapshot={checkedAt:Date.now(),book:{vault:'vault',maturity:market.maturityDateUnixTs,priceDecimals:6,queue:[{id:7,owner:'wallet',created:now-10,expiry:now+1000,virtual:0,amount:10000000n}]}};
+assert.deepEqual(sellQueuePosition(base,market,snapshot,now),{index:1,total:1});
+const groups=sellGroups([{...base,id:2,offer_idx:8,price_implied_apy:65100},{...base,id:1}],market,new Map(),now);
+assert.equal(groups.length,1,'0.1 percentage-point aggregation');
+assert.ok(groups[0].rows[0].order.price_implied_apy<groups[0].rows[1].order.price_implied_apy,'sell APY ascending');
+assert.equal(groups[0].total,20);
+assert.equal(sellOpenOrders([{...base,is_removed:true},{...base,expiry_at:new Date((now-1)*1000).toISOString()}],market,now).length,0);
+console.log('PASS: sell-side types, YT quantities, sell queue, ascending APY groups, expiry and cancellation');

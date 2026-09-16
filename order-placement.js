@@ -38,7 +38,7 @@ function placementEvent(record,tx) {
   if(!tx.transaction?.signatures?.includes(record.signature))return null;
   const matches=ExponentBook.postEvents(tx).filter(e=>e.book===record.book&&e.vault===record.vault
     &&e.owner===record.owner&&e.id===record.offerId&&e.price===record.rawPrice
-    &&e.side===2&&e.virtual===0&&e.amount===record.original&&e.expirySeconds===record.expiry-record.created);
+    &&e.side===(record.orderSide==='sell'?1:2)&&e.virtual===0&&e.amount===record.original&&e.expirySeconds===record.expiry-record.created);
   // Ambiguous repeated IDs in one transaction must not pick an arbitrary event.
   return matches.length===1?matches[0]:null;
 }
@@ -69,6 +69,25 @@ async function reconcileBuyOrders(orders,market,snapshots) {
         ||snapshot.slot<tx.slot||offer.amount!==BigInt(o.amount_remaining)||offer.amount>BigInt(event.amount))return;
       o._chainCreated=offer.created;o._chainExpiry=offer.expiry;
     }catch{ /* Leave unresolved identities unverified; never guess an offset. */ }
+  }));
+  return output;
+}
+async function reconcileSellOrders(orders,market,snapshots) {
+  const output=orders.map(({_chainCreated,_chainExpiry,...o})=>o);
+  for(let i=0;i<output.length;i+=3)await Promise.all(output.slice(i,i+3).map(async o=>{
+    if(o.order_type!=='sellYT'||sellQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
+    const snapshot=snapshots.get(o.orderbook_address),book=snapshot?.book;
+    if(!book||snapshot.error||book.vault!==market.vaultAddress||book.maturity!==market.maturityDateUnixTs)return;
+    const offer=book.offers.get(o.offer_idx),price=book.prices.find(p=>p.id===offer?.pricePointer)?.price;
+    if(!offer||offer.owner!==o.user_address||offer.side!==1||offer.virtual!==0||price!==o.price_implied_apy)return;
+    const record=orderWatchRecord(o,market,'proof','sell');if(!record||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(record.signature))return;
+    try{
+      const tx=await placementRead('getTransaction',[record.signature,{encoding:'json',commitment:'finalized',maxSupportedTransactionVersion:0}]);
+      const event=placementEvent(record,tx);
+      if(!event||tx.blockTime!==offer.created||offer.expiry!==Math.min(offer.created+event.expirySeconds,book.maturity)
+        ||snapshot.slot<tx.slot||offer.amount!==BigInt(o.amount_remaining)||offer.amount>BigInt(event.amount))return;
+      o._chainCreated=offer.created;o._chainExpiry=offer.expiry;
+    }catch{}
   }));
   return output;
 }

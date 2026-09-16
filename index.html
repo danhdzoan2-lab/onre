@@ -292,6 +292,13 @@
     </div>
     <div id="buyBooks"></div>
   </section>
+  <section class="table-panel" aria-labelledby="sellBookTitle">
+    <div class="panel-header"><h2 class="panel-title" id="sellBookTitle">Sell Orderbook</h2><span id="sellBookDataHealth" class="data-health" role="img" aria-label="Waiting for data" title="Waiting for data"></span></div>
+    <div id="watchedSellOrders" hidden>
+      <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Remaining YT</th></tr></thead><tbody id="sellOrderWatchList" aria-label="Personal sell orders"></tbody></table></div>
+    </div>
+    <div id="sellBooks"></div>
+  </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
       <div class="panel-heading">
@@ -1013,6 +1020,7 @@
 <script src="orderbook.js"></script>
 <script src="order-rpc.js"></script>
 <script src="buy-orderbook.js"></script>
+<script src="sell-orderbook.js"></script>
 <script src="order-placement.js"></script>
 <script src="order-watch.js"></script>
 <script src="wallet-monitor.js"></script>
@@ -1040,7 +1048,7 @@
  .order-watch-button{min-height:30px;padding:4px 8px;margin-left:6px;font-size:12px}
  .order-watch-button[aria-pressed="true"]{background:#3c331e;color:#f2c565;border-color:#94753a}
  .book-orders tr[data-watched="true"]{background:#252315}
- #watchedBuyOrders{padding:10px 14px;border-top:1px solid var(--line)}
+ #watchedBuyOrders,#watchedSellOrders{padding:10px 14px;border-top:1px solid var(--line)}
  #orderWatchStatus{padding:0;margin:0 0 6px;color:#e6bd67}
  #orderWatchStatus:empty{display:none}
  .order-watch-item{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--line);border-radius:6px;margin:4px 0;font-size:14px}

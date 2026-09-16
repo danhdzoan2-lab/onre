@@ -55,7 +55,9 @@ function evaluateAutoLimitAlerts(fromScan=false){
       if(stale)continue;
       const edges=r.limitEdges||(r.limitEdges={}),reasons=[];
       const check=(name,value,message)=>{if(value===null)return;const previous=edges[name];edges[name]=value;if(value&&previous!==true)reasons.push(message);};
-      if(threshold!==null&&Number.isFinite(market.impliedApy)){const gap=side==='sell'?apy-market.impliedApy*100:market.impliedApy*100-apy;check('gap',gap<=threshold,'Gap ≤ '+threshold+' pp');}
+      // Threshold is a buy-side proximity guard. Sell orders alert only when
+      // they leave an active sellYT incentive range.
+      if(side==='buy'&&threshold!==null&&Number.isFinite(market.impliedApy))check('gap',market.impliedApy*100-apy<=threshold,'Gap ≤ '+threshold+' pp');
       const range=typeof limitRewardRangeCheck==='function'?limitRewardRangeCheck(market,apy,side==='sell'?'sellYT':'buyYT'):null;
       check('range',range?.outside??null,'Outside APY Range');
       if(!reasons.length||(selectedAssets.size&&!selectedAssets.has(assetKey)))continue;

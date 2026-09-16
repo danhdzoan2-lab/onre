@@ -99,13 +99,13 @@ function initApyRefresh(){
   const restart=seconds=>{if(apyRefreshTimer!==null)clearInterval(apyRefreshTimer);apyRefreshSeconds=seconds;apyRefreshTimer=setInterval(()=>{renderApy();void fetchApy();},seconds*1000);};
   let saved;try{saved=localStorage.getItem('exponent-apy-refresh-seconds-v1');}catch{}
   restart(parse(saved)??2);input.value=String(apyRefreshSeconds);
-  status.textContent=`Refresh every ${apyRefreshSeconds}s · Saved on this browser.`;
+  status.textContent='';status.hidden=true;
   const save=()=>{
     const seconds=parse(input.value);input.setAttribute('aria-invalid',String(seconds===null));
-    if(seconds===null){status.textContent='Enter a whole number from 2 to 3,600.';return;}
+    if(seconds===null){status.textContent='Enter a whole number from 2 to 3,600.';status.hidden=false;return;}
     restart(seconds);input.value=String(seconds);
-    try{localStorage.setItem('exponent-apy-refresh-seconds-v1',String(seconds));status.textContent=`Saved · Refresh every ${seconds}s on this browser.`;}
-    catch{status.textContent=`Refresh every ${seconds}s · Storage unavailable.`;}
+    try{localStorage.setItem('exponent-apy-refresh-seconds-v1',String(seconds));status.textContent='';status.hidden=true;}
+    catch{status.textContent=`Refresh every ${seconds}s · Storage unavailable.`;status.hidden=false;}
   };
   document.getElementById('saveApyRefresh').addEventListener('click',save);
   input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();save();}});

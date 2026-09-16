@@ -11,7 +11,8 @@ function parseTransactionRefreshSeconds(value) {
 }
 function showTransactionRefreshStatus(message, error = false) {
   const status = document.getElementById('transactionRefreshStatus');
-  status.textContent = message;
+  status.textContent = error ? message : '';
+  status.hidden = !error;
   status.dataset.error = String(error);
 }
 function restartTransactionRefresh(seconds) {

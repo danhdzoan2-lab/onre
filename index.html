@@ -275,11 +275,11 @@
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
   <section class="table-panel" aria-labelledby="buyBookTitle">
-    <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2></div>
-    <div class="wallet-controls">
+    <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span id="bookDataHealth" class="data-health" role="img" aria-label="Waiting for data" title="Waiting for data"></span></div>
+    <details class="wallet-controls"><summary>Manage wallets</summary>
       <form id="walletForm"><label for="walletAddress">Wallet address</label><input id="walletAddress" placeholder="Solana wallet address" autocomplete="off" spellcheck="false" maxlength="44" /><button type="submit">Add wallet</button><button type="button" id="refreshWalletOrders">Refresh orders</button></form>
       <p id="walletError" role="status" hidden></p><div id="walletList" aria-label="Tracked wallets"></div>
-    </div>
+    </details>
     <div id="watchedBuyOrders" hidden>
       <p id="orderWatchStatus" class="book-status" role="status"></p>
       <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Remaining YT</th></tr></thead><tbody id="orderWatchList" aria-label="Personal buy orders"></tbody></table></div>
@@ -1042,6 +1042,10 @@
  .order-watch-item button{min-height:32px;padding:5px 10px}
  .order-placement{flex-basis:100%;overflow-wrap:anywhere}
  .wallet-controls{padding:12px 14px;border-top:1px solid var(--line)}
+ .wallet-controls>summary{cursor:pointer;color:var(--muted);font-size:13px}.wallet-controls[open]>summary{margin-bottom:12px}
+ .data-health{display:inline-block;width:9px;height:9px;border-radius:50%;background:#dfb94e;flex-shrink:0}.data-health[data-fresh="true"]{background:#60ce93}
+ .position-first{color:#ff7979;font-weight:700}.position-next{color:#dfb94e;font-weight:700}
+ .personal-orders tbody tr{cursor:pointer}.personal-orders tbody tr:hover,.personal-orders tbody tr:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
  #walletForm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  #walletAddress{flex:1;min-width:220px;max-width:470px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit}
  #walletAddress:focus{outline:1px solid var(--accent)}

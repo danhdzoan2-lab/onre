@@ -60,8 +60,10 @@ if(typeof module!=='undefined')module.exports={buyRawAmount,buyOrderApy,buyYtEst
 
 if(typeof window!=='undefined'){
   const buyViews=new Map();
+  window.buyBookHealth=new Map();
   function buyQuantity(n){return n===null?'—':n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function renderBuyMarket(view){
+    window.buyBookHealth.set(view.assetKey,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
     const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>12000||Date.now()-view.checkedAt>12000;
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.orders)return;
@@ -82,7 +84,7 @@ if(typeof window!=='undefined'){
         const watch=typeof orderWatchButton==='function'?orderWatchButton(o,view.dataMarket||view.market,view.assetKey,stale):'';
         const attrs=typeof orderWatchRowAttributes==='function'?orderWatchRowAttributes(o,view.dataMarket||view.market,view.assetKey):'';
         if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{index:rowIndex+1,total:g.rows.length,apy:g.apy,stale,checkedAt:view.checkedAt});
-        return `<tr ${attrs}><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td title="Display position in this APY group">${rowIndex+1} / ${g.rows.length}${stale?' *':''}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td></tr>`;
+        return `<tr ${attrs}><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td class="${rowIndex===0&&g.rows.length>=2?'position-first':rowIndex===1?'position-next':''}" title="Display position in this APY group">${rowIndex+1} / ${g.rows.length}${stale?' *':''}</td><td class="amount" title="${escapeHtml(priceTitle)}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td title="Estimated YT before fees${stale?' · Stale data':''}">${buyQuantity(yt)}${stale&&yt!==null?' *':''}</td></tr>`;
       }).join('');
       const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Remaining YT</th></tr></thead><tbody>${rows}</tbody></table>`;
       if(node.scroll.innerHTML!==html){
@@ -93,6 +95,10 @@ if(typeof window!=='undefined'){
       // Do not detach unchanged accordions: that resets scroll anchoring/focus.
       if(view.content.children[groupIndex]!==node.details)view.content.insertBefore(node.details,view.content.children[groupIndex]||null);
       groupIndex++;
+      if(view.pendingOrder){
+        const target=[...node.scroll.querySelectorAll('tr[data-order-key]')].find(row=>row.dataset.orderKey===view.pendingOrder);
+        if(target){node.details.open=true;target.tabIndex=-1;target.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});view.pendingOrder=null;}
+      }
     }
     for(const [key,node] of view.groups)if(!live.has(key)){node.details.remove();view.groups.delete(key);}
   }
@@ -124,9 +130,10 @@ if(typeof window!=='undefined'){
         view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
         details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
-      const market=farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
+      const market=(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
       if(view.identity!==identity){view.identity=identity;view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.status.textContent='';}
       view.market=market;view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);
+      window.buyBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
       const emptyLabel=apyState.markets?'No active market':apyState.error?'Market data unavailable':'Loading markets…';
       const html=`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):emptyLabel}</span>`;
       if(view.summary.innerHTML!==html)view.summary.innerHTML=html;
@@ -135,5 +142,12 @@ if(typeof window!=='undefined'){
   }
   window.addEventListener('load',renderBuyBooks);
   window.renderBuyBooks=renderBuyBooks;
+  window.openPersonalBuyOrder=function(key){
+    const r=orderWatchState.records.get(key);if(!r)return;
+    const market=(apyState.markets||[]).find(m=>m.vaultAddress===r.vault&&m.maturityDateUnixTs===r.maturity&&m.orderbookAddresses?.includes(r.book));if(!market)return;
+    if(selectedAssets.size&&!selectedAssets.has(r.assetKey))setAssetFilter(r.assetKey);
+    renderBuyBooks();const view=buyViews.get(r.assetKey);if(!view)return;
+    view.navigationVault=r.vault;renderBuyBooks();view.pendingOrder=key;view.details.open=true;renderBuyMarket(view);void refreshBuyMarket(view);
+  };
   setInterval(renderBuyBooks,2000);
 }

@@ -64,7 +64,7 @@ if(typeof window!=='undefined'){
   function buyQuantity(n){return n===null?'—':n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function renderBuyMarket(view){
     window.buyBookHealth.set(view.assetKey,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
-    const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>12000||Date.now()-view.checkedAt>12000;
+    const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():12000)||Date.now()-view.checkedAt>12000;
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.orders)return;
     const groups=buyGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();

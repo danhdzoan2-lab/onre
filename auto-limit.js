@@ -30,7 +30,7 @@ renderLimitCells=function(row,assetKey,market){
     const prior=levels.get(o.r.rawPrice);
     if(!prior)levels.set(o.r.rawPrice,{...o});else prior.stale=prior.stale||o.stale;
   }
-  const orders=[...levels.values()],apyStale=!!apyState.error||Date.now()-apyState.checkedAt>8000;
+  const orders=[...levels.values()],apyStale=!!apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():8000);
   row.autoValues.textContent=orders.length?orders.map(o=>o.apy.toFixed(2)+'%'+(o.stale?' *':'')).join('\n'):'—';
   row.autoValues.title=orders.some(o=>o.stale)?'Stale data':'From open buy orders';
   row.limitGap.textContent=orders.length?orders.map(o=>{
@@ -46,7 +46,7 @@ renderLimitAlarmRow=function(row){
 };
 function evaluateAutoLimitAlerts(fromScan=false){
   const messages=[];
-  if(!limitState.enabled||(!fromScan&&orderWatchState.busy)||apyState.error||!apyState.checkedAt||Date.now()-apyState.checkedAt>8000)return messages;
+  if(!limitState.enabled||(!fromScan&&orderWatchState.busy)||apyState.error||!apyState.checkedAt||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():8000))return messages;
   for(const [assetKey,asset] of Object.entries(ASSETS)){
     const market=farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000);
     if(!market)continue;

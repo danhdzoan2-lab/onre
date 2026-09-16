@@ -18,7 +18,7 @@ function renderLimitAlarm() {
   if (!panel) return;
   panel.hidden = limitAlarm.entries.size === 0;
   document.getElementById('limitAlarmItems').textContent = [...limitAlarm.entries.values()].join('\n');
-  document.getElementById('limitAlarmData').textContent = apyState.error || Date.now() - apyState.checkedAt > 10000
+  document.getElementById('limitAlarmData').textContent = apyState.error || Date.now() - apyState.checkedAt > (typeof apyMaxAge==='function'?apyMaxAge():10000)
     ? 'APY data stale / offline. Press Stop Alarm to silence.'
     : 'Alarm stays on until stopped.';
 }

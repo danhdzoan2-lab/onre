@@ -91,10 +91,29 @@ async function fetchApy() {
   }
 }
 
+let apyRefreshSeconds=2,apyRefreshTimer=null;
+function apyMaxAge(){return Math.max(12000,apyRefreshSeconds*1000+8000);}
+function initApyRefresh(){
+  const input=document.getElementById('apyRefreshSeconds'),status=document.getElementById('apyRefreshStatus');
+  const parse=v=>typeof v==='string'&&/^\d+$/.test(v.trim())&&Number(v)>=2&&Number(v)<=3600?Number(v):null;
+  const restart=seconds=>{if(apyRefreshTimer!==null)clearInterval(apyRefreshTimer);apyRefreshSeconds=seconds;apyRefreshTimer=setInterval(()=>{renderApy();void fetchApy();},seconds*1000);};
+  let saved;try{saved=localStorage.getItem('exponent-apy-refresh-seconds-v1');}catch{}
+  restart(parse(saved)??2);input.value=String(apyRefreshSeconds);
+  status.textContent=`Refresh every ${apyRefreshSeconds}s · Saved on this browser.`;
+  const save=()=>{
+    const seconds=parse(input.value);input.setAttribute('aria-invalid',String(seconds===null));
+    if(seconds===null){status.textContent='Enter a whole number from 2 to 3,600.';return;}
+    restart(seconds);input.value=String(seconds);
+    try{localStorage.setItem('exponent-apy-refresh-seconds-v1',String(seconds));status.textContent=`Saved · Refresh every ${seconds}s on this browser.`;}
+    catch{status.textContent=`Refresh every ${seconds}s · Storage unavailable.`;}
+  };
+  document.getElementById('saveApyRefresh').addEventListener('click',save);
+  input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();save();}});
+}
 if (typeof window !== 'undefined') {
   window.addEventListener('load', () => {
     renderApy();
     fetchApy();
-    setInterval(() => { renderApy(); fetchApy(); }, 2000);
+    initApyRefresh();
   });
 }

@@ -52,6 +52,7 @@
     .proxy-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 214, 143, 0.12); }
     .refresh-settings { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin-top:14px; }
     .refresh-settings .field { width:240px; max-width:100%; }
+    .refresh-pair{display:flex;flex-wrap:wrap;gap:24px}.refresh-pair>.refresh-settings{flex:1 1 340px}.refresh-pair .refresh-settings p{flex-basis:100%;margin:0}
     .refresh-settings input { width:100%; min-height:38px; padding:8px 11px; border:1px solid var(--line); border-radius:8px; background:#090b08; color:var(--text); font:inherit; }
     #transactionRefreshStatus { flex-basis:100%; color:var(--muted); font-size:0.82rem; margin:0; }
     #transactionRefreshStatus[data-error="true"] { color:#ffb4a8; }
@@ -225,7 +226,7 @@
       </div>
       <button type="button" class="primary-action" onclick="fetchAll()">Load data</button>
     </div>
-    <div class="refresh-settings">
+    <div class="refresh-pair"><div class="refresh-settings">
       <div class="field">
         <label for="transactionRefreshSeconds">Transaction refresh (seconds)</label>
         <input id="transactionRefreshSeconds" type="number" min="2" max="3600" step="1" value="2" inputmode="numeric" aria-describedby="transactionRefreshStatus" />
@@ -233,6 +234,11 @@
       <button id="saveTransactionRefresh" type="button" class="primary-action">Save</button>
       <p id="transactionRefreshStatus" role="status" aria-live="polite"></p>
     </div>
+    <div class="refresh-settings">
+      <div class="field"><label for="apyRefreshSeconds">Market APY refresh (seconds)</label><input id="apyRefreshSeconds" type="number" min="2" max="3600" step="1" value="2" inputmode="numeric" aria-describedby="apyRefreshStatus" /></div>
+      <button id="saveApyRefresh" type="button" class="primary-action">Save</button>
+      <p id="apyRefreshStatus" role="status" aria-live="polite"></p>
+    </div></div>
     <div class="notice-row">
       <span id="volumeNote" hidden></span>
     </div></details>

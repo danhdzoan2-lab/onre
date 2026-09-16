@@ -48,7 +48,7 @@ function removeMonitorWallet(wallet){
 renderOrderWatches=function(){
   const dot=document.getElementById('bookDataHealth');
   if(dot){
-    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=12000&&!walletMonitor.scanError&&[...orderWatchState.records.values()].every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&(!walletMonitor.wallets.size||!!walletMonitor.checkedAt&&Date.now()-walletMonitor.checkedAt<=12000)&&!(typeof window!=='undefined'&&window.buyBookHealth&&[...window.buyBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
+    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&(!walletMonitor.wallets.size||!!walletMonitor.checkedAt&&Date.now()-walletMonitor.checkedAt<=12000)&&!(typeof window!=='undefined'&&window.buyBookHealth&&[...window.buyBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
     dot.dataset.fresh=String(fresh);dot.title=fresh?'Data up to date':'Data unavailable or outdated';dot.setAttribute('aria-label',dot.title);
   }
   const root=document.getElementById('watchedBuyOrders');if(!root)return;
@@ -102,7 +102,7 @@ async function scanWalletMarket(market,assetKey){
 pollOrderWatches=async function(force=false){
   if(force)walletMonitor.pending=true;
   if(orderWatchState.busy||!walletMonitor.wallets.size||(!limitState.enabled&&!walletMonitor.pending))return;
-  if(!apyState.markets||apyState.error||Date.now()-apyState.checkedAt>12000){
+  if(!apyState.markets||apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():12000)){
     walletMonitor.scanError='Market data unavailable.';renderOrderWatches();return;
   }
   orderWatchState.busy=true;walletMonitor.loading=true;walletMonitor.pending=false;

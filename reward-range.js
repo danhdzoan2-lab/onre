@@ -47,6 +47,19 @@ function limitRewardRangeCheck(market, manual, orderType='buyYT') {
 function formatRewardsApy(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? `${value.toFixed(2)}%` : '—';
 }
+// API record id is distinct from the reusable on-chain offer_idx.
+function orderRewardsText(order, state=rewardRangeState, now=Date.now()) {
+  if (!order || !Array.isArray(state.campaigns) || state.error || !state.checkedAt || now-state.checkedAt>10000) return '—';
+  const id=order.id??order.apiOrderId, vault=order.vault_address??order.vault, book=order.orderbook_address??order.book;
+  const type=order.order_type??order.orderType;
+  if (!/^[1-9]\d*$/.test(String(id)) || (typeof id==='number'&&!Number.isSafeInteger(id))) return '—';
+  const values=state.campaigns.filter(c=>c.vaultAddress===vault&&c.orderbookAddress===book
+    &&c.campaignType==='orderbook_quote'&&c.isActive!==false&&c.incentivizedOrderTypes?.includes(type)
+    &&Date.parse(c.startsAt)<=now&&Date.parse(c.endsAt)>now&&rewardBudget(c)===true)
+    .sort((a,b)=>String(a.id).localeCompare(String(b.id)))
+    .map(c=>formatRewardsApy(c.currentRewardsApyByOrderId?.[String(id)]));
+  return values.length?values.join(' / '):'—';
+}
 function formatInwardRange(low, high) {
   if (!Number.isFinite(low) || !Number.isFinite(high) || low > high || Math.max(Math.abs(low),Math.abs(high)) > 1e10) return '—';
   let lower = Math.ceil(low * 1000), upper = Math.floor(high * 1000);
@@ -133,6 +146,8 @@ async function fetchRewardRanges() {
     const status = document.getElementById('rewardRangeStatus');
     if (status) status.textContent = `${state.error ? 'Range stale / unknown · ' + state.error + ' · ' : ''}Range: ${state.checkedAt ? 'Updated: ' + apyDate(state.checkedAt) : 'Not updated yet'}`;
     renderApy();
+    // Refresh personal rewards even when wallet polling is paused (Alarm OFF).
+    if (typeof renderOrderWatches === 'function') renderOrderWatches();
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {

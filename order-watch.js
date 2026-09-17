@@ -15,7 +15,7 @@ function orderWatchRecord(o, market, assetKey, orderSide='buy') {
   const r = {assetKey,book:o.orderbook_address,vault:o.vault_address,maturity:market.maturityDateUnixTs,
     owner:o.user_address,offerId:o.offer_idx,rawPrice:o.price_implied_apy,created:Date.parse(o.created_at)/1000,
     expiry:Date.parse(o.expiry_at)/1000,original:String(o.original_amount),signature:o.tx_signature || '',
-    orderSide,orderType:o.order_type,verified:false,front:null,ack:false,status:'Checking',detail:'Waiting for a fresh on-chain snapshot.'};
+    apiOrderId:o.id,orderSide,orderType:o.order_type,verified:false,front:null,ack:false,status:'Checking',detail:'Waiting for a fresh on-chain snapshot.'};
   const expected=orderSide==='sell'?'sellYT':'buyYT';
   if(o.order_type!==expected||!market.orderbookAddresses?.includes(r.book)||r.vault!==market.vaultAddress
     ||r.expiry!==r.created+o.expiry_seconds||!validOrderWatch(r))return null;

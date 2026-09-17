@@ -12,7 +12,7 @@ function fixture(storage){
  localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v)},setInterval(){},getProxy:()=> 'proxy',apyDate:String,buyOrderApy:p=>100*Math.expm1(p/1e6),
  apyState:{markets:[market,{...market,vaultAddress:'second',maturityDateUnixTs:now+20000}],checkedAt:Date.now(),error:''},renderApy(){},renderBuyBooks(){},selectedAssets:new Set(['unrelated']),
  sound:()=>sounds++,notice:async()=>notices++});
- for(const file of ['limit-monitor.js','order-watch.js','wallet-monitor.js'])vm.runInContext(fs.readFileSync(require('path').join(__dirname,'..',file),'utf8'),ctx);
+ for(const file of ['limit-monitor.js','reward-range.js','order-watch.js','wallet-monitor.js'])vm.runInContext(fs.readFileSync(require('path').join(__dirname,'..',file),'utf8'),ctx);
  const run=s=>vm.runInContext(s,ctx);ctx.owner=owner;ctx.other=other;ctx.api=api;ctx.market=market;ctx.mode='first';
  ctx.scan=async m=>{scans++;if(ctx.hold)await new Promise(resolve=>ctx.release=resolve);if(ctx.mode==='error')throw Error('offline');if(m.vaultAddress==='second'||ctx.mode==='empty')return {market:m,records:[],groups:[],checkedAt:Date.now()};
  const r=run("orderWatchRecord(api,market,'eusx')"),competitor={order:{...api,offer_idx:3}};

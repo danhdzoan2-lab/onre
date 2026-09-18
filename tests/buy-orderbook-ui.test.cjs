@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 class Element{
- constructor(){this.children=[];this.innerHTML='';this.textContent='';this.open=false;this.hidden=false;this.events={};}
+ constructor(){this.children=[];this.dataset={};this.innerHTML='';this.textContent='';this.open=false;this.hidden=false;this.events={};}
  append(...xs){for(const x of xs)this.appendChild(x);}
  appendChild(x){if(x.parent)x.parent.children=x.parent.children.filter(y=>y!==x);x.parent=this;this.children.push(x);return x;}
  insertBefore(x,before){if(!before)return this.appendChild(x);if(x.parent)x.parent.children=x.parent.children.filter(y=>y!==x);x.parent=this;this.children.splice(this.children.indexOf(before),0,x);return x;}

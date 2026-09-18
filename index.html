@@ -279,28 +279,22 @@
     <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
-  <section class="table-panel" aria-labelledby="simulationTitle">
-    <div class="panel-header"><h2 class="panel-title" id="simulationTitle">Simulated Rewards</h2></div>
-    <div id="rewardSimulations"></div>
-  </section>
-  <section class="table-panel" aria-labelledby="buyBookTitle">
-    <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span id="bookDataHealth" class="data-health" role="img" aria-label="Waiting for data" title="Waiting for data"></span></div>
+  <section class="table-panel" aria-labelledby="marketTitle">
+    <div class="panel-header"><h2 class="panel-title" id="marketTitle">Market</h2></div>
     <details class="wallet-controls"><summary>Manage wallets</summary>
       <form id="walletForm"><label for="walletAddress">Wallet address</label><input id="walletAddress" placeholder="Solana wallet address" autocomplete="off" spellcheck="false" maxlength="44" /><button type="submit">Add wallet</button><button type="button" id="refreshWalletOrders">Refresh orders</button></form>
       <p id="walletError" role="status" hidden></p><div id="walletList" aria-label="Tracked wallets"></div>
     </details>
     <div id="watchedBuyOrders" hidden>
+      <div class="panel-header"><h3 class="panel-title">Personal Buy Orders</h3><span id="bookDataHealth" class="data-health" role="img" aria-label="Waiting for data"></span></div>
       <p id="orderWatchStatus" class="book-status" role="status"></p>
       <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Rewards APY</th><th>Remaining YT</th></tr></thead><tbody id="orderWatchList" aria-label="Personal buy orders"></tbody></table></div>
     </div>
-    <div id="buyBooks"></div>
-  </section>
-  <section class="table-panel" aria-labelledby="sellBookTitle">
-    <div class="panel-header"><h2 class="panel-title" id="sellBookTitle">Sell Orderbook</h2><span id="sellBookDataHealth" class="data-health" role="img" aria-label="Waiting for data" title="Waiting for data"></span></div>
     <div id="watchedSellOrders" hidden>
+      <div class="panel-header"><h3 class="panel-title">Personal Sell Orders</h3><span id="sellBookDataHealth" class="data-health" role="img" aria-label="Waiting for data"></span></div>
       <div class="book-scroll"><table class="book-orders personal-orders"><thead><tr><th>Token</th><th>Maturity</th><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Rewards APY</th><th>Remaining YT</th></tr></thead><tbody id="sellOrderWatchList" aria-label="Personal sell orders"></tbody></table></div>
     </div>
-    <div id="sellBooks"></div>
+    <div id="marketTokens"></div>
   </section>
   <section class="table-panel" aria-labelledby="panelTitle">
     <div class="panel-header">
@@ -648,7 +642,8 @@
     renderCurrentTransactions();
     renderApy();
     updateNotifUI();
-    if (typeof window.renderBuyBooks === 'function') window.renderBuyBooks();
+    if (window.marketLayout) window.marketLayout.renderAll();
+    else if (typeof window.renderBuyBooks === 'function') window.renderBuyBooks();
   }
 
   function initAudioContext() {
@@ -1022,6 +1017,7 @@
 <script src="reward-range.js"></script>
 <script src="orderbook.js"></script>
 <script src="order-rpc.js"></script>
+<script src="market-layout.js"></script>
 <script src="buy-orderbook.js"></script>
 <script src="sell-orderbook.js"></script>
 <script src="order-placement.js"></script>

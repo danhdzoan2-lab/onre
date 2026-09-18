@@ -5,17 +5,18 @@ for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){
  if(src){assert.ok(fs.existsSync(path.join(root,src[1])),`Missing ${src[1]}`);new vm.Script(fs.readFileSync(path.join(root,src[1]),'utf8'),{filename:src[1]});}
  else new vm.Script(match[2]);
 }
-assert.equal((html.match(/id="buyBooks"/g)||[]).length,1);
-assert.equal((html.match(/id="sellBooks"/g)||[]).length,1);
+assert.equal((html.match(/id="marketTokens"/g)||[]).length,1);
+assert.ok(!/id="(?:buyBooks|sellBooks|rewardSimulations)"/.test(html));
 const apySection=html.slice(html.indexOf('aria-labelledby="apyTitle"'),html.indexOf('id="apyRows"'));
 for(const token of ['all','onyc','sronyc','eusx','usx','srehyusd']){
  assert.equal((html.match(new RegExp(`id="${token}FilterBtn"`,'g'))||[]).length,1);
  assert.ok(apySection.includes(`id="${token}FilterBtn"`));
 }
 assert.ok(!html.includes('Exponent Markets ↗'));
-assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="buyBooks"'));
-assert.ok(html.indexOf('id="buyBooks"')<html.indexOf('id="panelTitle"'));
-assert.ok(html.indexOf('id="buyBooks"')<html.indexOf('id="sellBooks"'));
+assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="marketTitle"'));
+assert.ok(html.indexOf('id="marketTokens"')<html.indexOf('id="panelTitle"'));
+assert.ok(html.indexOf('id="orderWatchList"')<html.indexOf('id="sellOrderWatchList"'));
+assert.ok(html.indexOf('id="sellOrderWatchList"')<html.indexOf('id="marketTokens"'));
 assert.doesNotMatch(html,/orderMarkers|orderMarkButtons|importOrder|order-monitor\.js/);
 assert.doesNotMatch(fs.readFileSync(path.join(root,'buy-orderbook.js'),'utf8'),/data-buy-mark|data-remove-marker|localStorage/);
 assert.ok(html.includes('src="order-watch.js"'));
@@ -26,7 +27,6 @@ assert.equal((html.match(/id="watchedBuyOrders"/g)||[]).length,1);
 assert.equal((html.match(/id="watchedSellOrders"/g)||[]).length,1);
 assert.match(html,/SIGNATURE_SCAN_LIMIT = 50/);assert.match(html,/DISPLAY_LIMIT = 50/);
 assert.ok(!html.includes('id="strcxFilterBtn"'));
-assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="rewardSimulations"'));
-assert.ok(html.indexOf('id="rewardSimulations"')<html.indexOf('id="buyBooks"'));
+assert.ok(html.includes('src="market-layout.js"'));
 assert.ok(fs.existsSync(path.join(root,'reward-simulation.css')));
 console.log('PASS: script syntax, five filters, simulation placement, wallet controls, and no manual Watch buttons');

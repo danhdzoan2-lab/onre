@@ -122,20 +122,22 @@ if(typeof window!=='undefined'){
     finally{s.inFlight=false;for(const view of views.values())paint(view);}
   }
   window.renderRewardSimulations=function(){
-    const root=document.getElementById('rewardSimulations');if(!root)return;
-    for(const key of SIMULATION_KEYS){
+    const layout=window.marketLayout;layout?.sync();
+    const root=document.getElementById('marketTokens')||document.getElementById('rewardSimulations');if(!root)return;
+    for(const key of (layout?layout.keys():SIMULATION_KEYS)){
       const asset=ASSETS[key];if(!asset)continue;let view=views.get(key);
       if(!view){
-        const details=node('details','sim-token'),summary=node('summary'),label=node('strong'),maturity=node('span','book-hint'),dot=node('span','data-health'),content=node('div','sim-content'),form=node('label','sim-capital'),input=node('input'),unit=node('span'),error=node('span','sim-error'),status=node('div','sim-status'),body=node('div'),note=node('p','sim-note','Assumes maximum fill and queue scores. Not guaranteed rewards.');
+        const details=layout?layout.mount(key,'simulation'):node('details','sim-token'),summary=node(layout?'h3':'summary',layout?'market-section-title':''),label=node('strong'),maturity=node('span','book-hint'),dot=node('span','data-health'),content=node('div','sim-content'),form=node('label','sim-capital'),input=node('input'),unit=node('span'),error=node('span','sim-error'),status=node('div','sim-status'),body=node('div'),note=node('p','sim-note','Assumes maximum fill and queue scores. Not guaranteed rewards.');
         dot.setAttribute('role','img');summary.append(label,maturity,dot);input.type='number';input.min='0.000000001';input.max='1000000000000';input.step='any';input.inputMode='decimal';input.setAttribute('aria-label',`Simulated capital in ${asset.label}`);
-        const amount=simulationAmount(String(saved[key]??''))??1000;input.value=String(amount);unit.textContent=asset.label;form.append(document.createTextNode('Simulated capital '),input,unit);error.setAttribute('role','status');content.append(form,error,status,body,note);details.append(summary,content);root.appendChild(details);
+        const amount=simulationAmount(String(saved[key]??''))??1000;input.value=String(amount);unit.textContent=asset.label;form.append(document.createTextNode('Simulated capital '),input,unit);error.setAttribute('role','status');content.append(form,error,status,body,note);details.append(summary,content);if(!layout)root.appendChild(details);
         view={details,label,maturity,dot,input,error,status,body,cards:new Map(),amount};views.set(key,view);
         input.addEventListener('input',()=>{const n=simulationAmount(input.value);input.setAttribute('aria-invalid',String(n===null));error.textContent=n===null?'Enter a positive amount up to 1,000,000,000,000.':'';if(n===null)return;
           view.amount=n;saved[key]=n;try{localStorage.setItem(SIMULATION_STORAGE,JSON.stringify(saved));}catch{error.textContent='Browser storage unavailable.';}paint(view);});
         details.addEventListener('toggle',()=>{if(details.open){paint(view);for(const card of view.cards.values())if(card.model)drawChart(card);void fetchSimulationCampaigns();}});
       }
-      view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);view.label.textContent=asset.label;
-      view.market=farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000);
+      view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);view.label.textContent=layout?'Simulated Rewards':asset.label;
+      view.market=layout?layout.market(key):farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000);
+      view.maturity.hidden=!!layout;
       view.maturity.textContent=view.market?apyDate(view.market.maturityDateUnixTs*1000):'No active maturity';
       paint(view);
     }

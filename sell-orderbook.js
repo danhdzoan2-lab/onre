@@ -45,6 +45,8 @@ if(typeof window!=='undefined'){
     window.sellBookHealth.set(view.assetKey,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
     const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():12000)||Date.now()-view.checkedAt>12000;
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
+    if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
+    view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
     if(!view.orders)return;
     const groups=sellGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();
     if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=stale?'Stale · No sell orders in last response':'No open sell orders';
@@ -62,7 +64,11 @@ if(typeof window!=='undefined'){
         return `<tr data-order-key="${escapeHtml(key)}" data-watched="${watched}" data-order-alarm="${alarm}"><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td class="${rowIndex===0&&g.rows.length>=2?'position-first':rowIndex===1?'position-next':''}">${rowIndex+1} / ${g.rows.length}</td><td class="amount" title="Raw price: ${o.price_implied_apy}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td class="amount" title="Current order rewards estimate from Exponent">${orderRewardsText(o)}</td><td>${qty(yt)}</td></tr>`;
       }).join('');
       const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Rewards APY</th><th>Remaining YT</th></tr></thead><tbody>${rows}</tbody></table>`;
-      if(node.scroll.innerHTML!==html)node.scroll.innerHTML=html;
+      if(node.scroll.innerHTML!==html){
+        const focusedOrder=document.activeElement?.dataset?.orderKey;
+        node.scroll.innerHTML=html;
+        if(focusedOrder)for(const row of node.scroll.querySelectorAll('tr[data-order-key]'))if(row.dataset.orderKey===focusedOrder){row.tabIndex=-1;row.focus({preventScroll:true});}
+      }
       if(view.content.children[groupIndex]!==node.details)view.content.insertBefore(node.details,view.content.children[groupIndex]||null);groupIndex++;
       if(view.pendingOrder){const target=[...node.scroll.querySelectorAll('tr[data-order-key]')].find(row=>row.dataset.orderKey===view.pendingOrder);if(target){node.details.open=true;target.tabIndex=-1;target.scrollIntoView({block:'center'});target.focus({preventScroll:true});view.pendingOrder=null;}}
     }
@@ -74,23 +80,26 @@ if(typeof window!=='undefined'){
     try{
       const data=await placementOpenOrders(market.vaultAddress),results=await Promise.all((market.orderbookAddresses||[]).map(async address=>{try{return [address,await getOrderBookSnapshot(address)];}catch(e){return [address,{error:e.message}];}}));
       if(view.identity!==identity)return;const snapshots=new Map(results),reconciled=typeof reconcileSellOrders==='function'?await reconcileSellOrders(data,market,snapshots):data;
+      if(view.identity!==identity)return;
       view.orders=reconciled;view.dataMarket=market;view.snapshots=snapshots;view.checkedAt=Date.now();view.error=results.some(([,s])=>s.error)?'On-chain queue unavailable; positions unverified':'';view.retryAt=0;
     }catch(e){if(view.identity===identity){view.error=e.message;view.retryAt=Date.now()+5000;}}
     finally{view.busy=false;if(view.identity===identity)renderSellMarket(view);}
   }
   function renderSellBooks(){
-    const root=document.getElementById('sellBooks');if(!root)return;
-    for(const [key,asset] of Object.entries(ASSETS)){
+    const layout=window.marketLayout;layout?.sync();
+    const root=document.getElementById('marketTokens')||document.getElementById('sellBooks');if(!root)return;
+    for(const key of (layout?layout.keys():Object.keys(ASSETS))){
+      const asset=ASSETS[key];
       let view=views.get(key);
-      if(!view){const details=document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');details.className='book-market';status.className='book-status';details.append(summary,status,content);root.appendChild(details);view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};views.set(key,view);details.addEventListener('toggle',()=>{if(details.open){renderSellMarket(view);void refreshSellMarket(view);}});}
-      const market=(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
-      if(view.identity!==identity){view.identity=identity;view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';}
+      if(!view){const details=layout?layout.mount(key,'sell'):document.createElement('details'),summary=document.createElement(layout?'h3':'summary'),status=document.createElement('p'),content=document.createElement('div');if(!layout)details.className='book-market';summary.className='market-section-title';status.className='book-status';details.append(summary,status,content);if(!layout)root.appendChild(details);view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};views.set(key,view);details.addEventListener('toggle',()=>{if(details.open){renderSellMarket(view);void refreshSellMarket(view);}});}
+      const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
+      if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}
       view.market=market;view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);window.sellBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
-      view.summary.innerHTML=`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):'No active market'}</span>`;
-      if(view.details.open&&!view.details.hidden&&market){renderSellMarket(view);void refreshSellMarket(view);}
+      view.summary.innerHTML=layout?'Sell Orderbook':`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):'No active market'}</span>`;
+      if(view.details.open&&!view.details.hidden){if(market){renderSellMarket(view);void refreshSellMarket(view);}else view.status.textContent='No active market';}
     }
   }
   window.renderSellBooks=renderSellBooks;
-  window.openPersonalSellOrder=function(key){const r=orderWatchState.records.get(key);if(!r)return;const market=(apyState.markets||[]).find(m=>m.vaultAddress===r.vault&&m.maturityDateUnixTs===r.maturity);if(!market)return;if(selectedAssets.size&&!selectedAssets.has(r.assetKey))setAssetFilter(r.assetKey);renderSellBooks();const view=views.get(r.assetKey);view.navigationVault=r.vault;renderSellBooks();view.pendingOrder=key;view.details.open=true;renderSellMarket(view);void refreshSellMarket(view);};
+  window.openPersonalSellOrder=function(key){const r=orderWatchState.records.get(key);if(!r)return;const market=(apyState.markets||[]).find(m=>m.vaultAddress===r.vault&&m.maturityDateUnixTs===r.maturity);if(!market)return;if(selectedAssets.size&&!selectedAssets.has(r.assetKey))setAssetFilter(r.assetKey);window.marketLayout?.navigate(r);window.marketLayout?.renderAll();renderSellBooks();const view=views.get(r.assetKey);view.navigationVault=r.vault;renderSellBooks();view.pendingOrder=key;view.details.open=true;renderSellMarket(view);void refreshSellMarket(view);};
   window.addEventListener('load',renderSellBooks);setInterval(renderSellBooks,2000);
 }

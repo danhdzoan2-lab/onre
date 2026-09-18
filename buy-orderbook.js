@@ -66,6 +66,8 @@ if(typeof window!=='undefined'){
     window.buyBookHealth.set(view.assetKey,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
     const stale=!!view.error||!!apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():12000)||Date.now()-view.checkedAt>12000;
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
+    if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
+    view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
     if(!view.orders)return;
     const groups=buyGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();
     if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=stale?'Stale · No buy orders in last response':'No open buy orders';
@@ -89,8 +91,10 @@ if(typeof window!=='undefined'){
       const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Rewards APY</th><th>Remaining YT</th></tr></thead><tbody>${rows}</tbody></table>`;
       if(node.scroll.innerHTML!==html){
         const focusKey=document.activeElement?.dataset?.orderWatch;
+        const focusedOrder=document.activeElement?.dataset?.orderKey;
         node.scroll.innerHTML=html;
         if(focusKey)for(const button of node.scroll.querySelectorAll('button[data-order-watch]'))if(button.dataset.orderWatch===focusKey)button.focus({preventScroll:true});
+        if(focusedOrder)for(const row of node.scroll.querySelectorAll('tr[data-order-key]'))if(row.dataset.orderKey===focusedOrder){row.tabIndex=-1;row.focus({preventScroll:true});}
       }
       // Do not detach unchanged accordions: that resets scroll anchoring/focus.
       if(view.content.children[groupIndex]!==node.details)view.content.insertBefore(node.details,view.content.children[groupIndex]||null);
@@ -121,21 +125,23 @@ if(typeof window!=='undefined'){
     finally{view.busy=false;if(view.identity===identity)renderBuyMarket(view);}
   }
   function renderBuyBooks(){
-    const root=document.getElementById('buyBooks');if(!root)return;
-    for(const [key,asset] of Object.entries(ASSETS)){
+    const layout=window.marketLayout;layout?.sync();
+    const root=document.getElementById('marketTokens')||document.getElementById('buyBooks');if(!root)return;
+    for(const key of (layout?layout.keys():Object.keys(ASSETS))){
+      const asset=ASSETS[key];
       let view=buyViews.get(key);
       if(!view){
-        const details=document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');
-        details.className='book-market';status.className='book-status';status.setAttribute('role','status');details.append(summary,status,content);root.appendChild(details);
+        const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement(layout?'h3':'summary'),status=document.createElement('p'),content=document.createElement('div');
+        if(!layout)details.className='book-market';summary.className='market-section-title';status.className='book-status';status.setAttribute('role','status');details.append(summary,status,content);if(!layout)root.appendChild(details);
         view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
         details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
-      const market=(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
-      if(view.identity!==identity){view.identity=identity;view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.status.textContent='';}
+      const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
+      if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}
       view.market=market;view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);
       window.buyBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
       const emptyLabel=apyState.markets?'No active market':apyState.error?'Market data unavailable':'Loading markets…';
-      const html=`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):emptyLabel}</span>`;
+      const html=layout?'Buy Orderbook':`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):emptyLabel}</span>`;
       if(view.summary.innerHTML!==html)view.summary.innerHTML=html;
       if(view.details.open&&!view.details.hidden){if(market){renderBuyMarket(view);void refreshBuyMarket(view);}else view.status.textContent='No active market';}
     }
@@ -146,6 +152,7 @@ if(typeof window!=='undefined'){
     const r=orderWatchState.records.get(key);if(!r)return;
     const market=(apyState.markets||[]).find(m=>m.vaultAddress===r.vault&&m.maturityDateUnixTs===r.maturity&&m.orderbookAddresses?.includes(r.book));if(!market)return;
     if(selectedAssets.size&&!selectedAssets.has(r.assetKey))setAssetFilter(r.assetKey);
+    window.marketLayout?.navigate(r);window.marketLayout?.renderAll();
     renderBuyBooks();const view=buyViews.get(r.assetKey);if(!view)return;
     view.navigationVault=r.vault;renderBuyBooks();view.pendingOrder=key;view.details.open=true;renderBuyMarket(view);void refreshBuyMarket(view);
   };

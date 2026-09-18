@@ -1,0 +1,28 @@
+.sim-token{border-top:1px solid var(--line)}
+.sim-token>summary{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;list-style:none}
+.sim-token>summary::-webkit-details-marker{display:none}
+.sim-token>summary:before{content:'▸';color:var(--muted)}
+.sim-token[open]>summary:before{content:'▾'}
+.sim-token>summary .data-health{margin-left:auto}
+.sim-content{padding:4px 16px 14px}
+.sim-capital{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px}
+.sim-capital input{max-width:210px;width:100%;font-size:16px;min-width:0;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px}
+.sim-campaign{padding-top:16px;min-width:0}
+.sim-campaign+.sim-campaign{border-top:1px solid var(--line);margin-top:16px}
+.sim-campaign-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
+.sim-market{color:#dfbd62}
+.sim-range,.sim-note,.sim-status,.sim-error{font-size:13px;color:var(--muted);margin-top:8px}
+.sim-status:empty,.sim-error:empty{display:none}
+.sim-error{color:#ffbd6c;display:block}
+.sim-chart{width:100%;min-width:0;touch-action:pan-y}
+.sim-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.sim-chart text{fill:var(--muted);font-size:12px}
+.sim-grid{stroke:var(--line);stroke-dasharray:3 5}
+.sim-area{fill:#dfbd62;fill-opacity:.16}
+.sim-line{fill:none;stroke:#dfbd62;stroke-width:2}
+.sim-center{stroke:#dfbd62;stroke-dasharray:7 6;opacity:.6}
+.sim-guide{stroke:var(--muted);stroke-dasharray:3 4}
+.sim-marker{fill:#dfbd62;stroke:var(--line);stroke-width:2}
+.sim-campaign input[type=range]{width:100%;padding:0;min-height:32px;accent-color:#dfbd62}
+.sim-values{font-size:14px;font-variant-numeric:tabular-nums;line-height:1.6;overflow-wrap:anywhere}
+@media(max-width:520px){.sim-content{padding:4px 10px 12px}.sim-token>summary{padding:12px 10px}.sim-token>summary .book-hint{font-size:12px}.sim-campaign-heading{align-items:flex-start}.sim-capital input{max-width:160px}}

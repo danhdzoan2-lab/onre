@@ -61,6 +61,7 @@ function renderApy() {
   const checked = apyState.checkedAt ? `Updated: ${apyDate(apyState.checkedAt)}` : 'Not updated yet';
   status.textContent = apyState.error ? `${apyState.markets ? 'Stale data · ' : ''}${apyState.error} · ${checked}`
     : apyState.checkedAt ? checked : 'Loading APY…';
+  if (typeof renderRewardSimulations === 'function') renderRewardSimulations();
 }
 
 async function fetchApy() {

@@ -8,7 +8,7 @@ for(const match of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)){
 assert.equal((html.match(/id="buyBooks"/g)||[]).length,1);
 assert.equal((html.match(/id="sellBooks"/g)||[]).length,1);
 const apySection=html.slice(html.indexOf('aria-labelledby="apyTitle"'),html.indexOf('id="apyRows"'));
-for(const token of ['all','onyc','strcx','sronyc','eusx','usx','srehyusd']){
+for(const token of ['all','onyc','sronyc','eusx','usx','srehyusd']){
  assert.equal((html.match(new RegExp(`id="${token}FilterBtn"`,'g'))||[]).length,1);
  assert.ok(apySection.includes(`id="${token}FilterBtn"`));
 }
@@ -25,4 +25,8 @@ assert.match(fs.readFileSync(path.join(root,'order-watch.js'),'utf8'),/function 
 assert.equal((html.match(/id="watchedBuyOrders"/g)||[]).length,1);
 assert.equal((html.match(/id="watchedSellOrders"/g)||[]).length,1);
 assert.match(html,/SIGNATURE_SCAN_LIMIT = 50/);assert.match(html,/DISPLAY_LIMIT = 50/);
-console.log('PASS: script syntax, six filters, wallet controls, and no manual Watch buttons');
+assert.ok(!html.includes('id="strcxFilterBtn"'));
+assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="rewardSimulations"'));
+assert.ok(html.indexOf('id="rewardSimulations"')<html.indexOf('id="buyBooks"'));
+assert.ok(fs.existsSync(path.join(root,'reward-simulation.css')));
+console.log('PASS: script syntax, five filters, simulation placement, wallet controls, and no manual Watch buttons');

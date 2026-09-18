@@ -262,7 +262,6 @@
         <button id="eusxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('eusx')">eUSX</button>
         <button id="usxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('usx')">USX</button>
         <button id="srehyusdFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('srehyusd')">srEHYUSD</button>
-        <button id="strcxFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('strcx')">STRCx</button>
       </div>
     </div>
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
@@ -279,6 +278,10 @@
     </div>
     <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
+  </section>
+  <section class="table-panel" aria-labelledby="simulationTitle">
+    <div class="panel-header"><h2 class="panel-title" id="simulationTitle">Simulated Rewards</h2></div>
+    <div id="rewardSimulations"></div>
   </section>
   <section class="table-panel" aria-labelledby="buyBookTitle">
     <div class="panel-header"><h2 class="panel-title" id="buyBookTitle">Buy Orderbook</h2><span id="bookDataHealth" class="data-health" role="img" aria-label="Waiting for data" title="Waiting for data"></span></div>
@@ -639,7 +642,7 @@
     else if (selectedAssets.has(nextFilter)) selectedAssets.delete(nextFilter);
     else selectedAssets.add(nextFilter);
     ['all', ...Object.keys(ASSETS)].forEach(filter => {
-      document.getElementById(`${filter}FilterBtn`).setAttribute('aria-pressed', String(filter === 'all' ? selectedAssets.size === 0 : selectedAssets.has(filter)));
+      document.getElementById(`${filter}FilterBtn`)?.setAttribute('aria-pressed', String(filter === 'all' ? selectedAssets.size === 0 : selectedAssets.has(filter)));
     });
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
     renderCurrentTransactions();
@@ -1025,6 +1028,8 @@
 <script src="order-watch.js"></script>
 <script src="wallet-monitor.js"></script>
 <script src="auto-limit.js"></script>
+<script src="reward-simulation.js"></script>
+<link rel="stylesheet" href="reward-simulation.css">
 <style>
  .book-market{border-top:1px solid var(--line)}
  .book-market>summary,.book-group>summary{cursor:pointer;line-height:1.4}

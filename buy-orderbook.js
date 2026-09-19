@@ -131,14 +131,14 @@ if(typeof window!=='undefined'){
       const asset=ASSETS[key];
       let view=buyViews.get(key);
       if(!view){
-        const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement(layout?'h3':'summary'),status=document.createElement('p'),content=document.createElement('div');
+        const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');
         if(!layout)details.className='book-market';summary.className='market-section-title';status.className='book-status';status.setAttribute('role','status');details.append(summary,status,content);if(!layout)root.appendChild(details);
         view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
         details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
       const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
       if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}
-      view.market=market;view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);
+      view.market=market;view.details.hidden=(selectedAssets.size>0&&!selectedAssets.has(key))||!!(layout&&!layout.get(key).details.open);
       window.buyBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
       const emptyLabel=apyState.markets?'No active market':apyState.error?'Market data unavailable':'Loading markets…';
       const html=layout?'Buy Orderbook':`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):emptyLabel}</span>`;

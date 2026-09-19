@@ -138,7 +138,7 @@ if(typeof window!=='undefined'){
       }
       const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
       if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}
-      view.market=market;view.details.hidden=(selectedAssets.size>0&&!selectedAssets.has(key))||!!(layout&&!layout.get(key).details.open);
+      view.market=market;view.details.hidden=(selectedAssets.size>0&&!selectedAssets.has(key))||!!(layout&&(!layout.active()||!layout.get(key).details.open));
       window.buyBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});
       const emptyLabel=apyState.markets?'No active market':apyState.error?'Market data unavailable':'Loading markets…';
       const html=layout?'Buy Orderbook':`<strong>${escapeHtml(asset.label)}</strong><span class="book-hint">${market?escapeHtml(apyDate(market.maturityDateUnixTs*1000)):emptyLabel}</span>`;

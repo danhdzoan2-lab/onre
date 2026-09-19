@@ -1,0 +1,16 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
+const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+for(const id of ['marketTab','transactionsTab','marketTabPanel','transactionsTabPanel'])assert.equal((html.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
+assert.match(html,/id="marketTab"[^>]*role="tab"[^>]*aria-selected="true"[^>]*aria-controls="marketTabPanel"/);
+assert.match(html,/id="transactionsTab"[^>]*role="tab"[^>]*aria-selected="false"[^>]*aria-controls="transactionsTabPanel"/);
+assert.match(html,/id="marketTabPanel"[^>]*role="tabpanel"/);
+assert.match(html,/id="transactionsTabPanel"[^>]*role="tabpanel"[^>]*hidden/);
+assert.ok(html.indexOf('id="apyRows"')<html.indexOf('id="marketTab"'));
+assert.ok(html.indexOf('id="marketTab"')<html.indexOf('id="marketTabPanel"'));
+assert.ok(html.indexOf('id="marketTokens"')<html.indexOf('id="transactionsTabPanel"'));
+assert.ok(html.indexOf('id="transactionsTabPanel"')<html.indexOf('id="txBody"'));
+assert.match(html,/function setDashboardTab\(name,focus=false\)/);
+assert.match(html,/updateTransactionsTabLabel\(\)/);
+assert.match(html,/\['ArrowLeft','ArrowRight','Home','End'\]/);
+assert.match(fs.readFileSync(path.join(root,'market-layout.js'),'utf8'),/function active\(\)/);
+console.log('PASS: accessible Market/Transactions tabs, default Market, dynamic label, keyboard navigation, and market visibility gate');

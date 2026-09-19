@@ -135,7 +135,7 @@ if(typeof window!=='undefined'){
           view.amount=n;saved[key]=n;try{localStorage.setItem(SIMULATION_STORAGE,JSON.stringify(saved));}catch{error.textContent='Browser storage unavailable.';}paint(view);});
         details.addEventListener('toggle',()=>{if(details.open){paint(view);for(const card of view.cards.values())if(card.model)drawChart(card);void fetchSimulationCampaigns();}});
       }
-      view.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);view.label.textContent=layout?'Simulated Rewards':asset.label;
+      view.details.hidden=(selectedAssets.size>0&&!selectedAssets.has(key))||!!(layout&&!layout.active());view.label.textContent=layout?'Simulated Rewards':asset.label;
       view.market=layout?layout.market(key):farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000);
       view.maturity.hidden=!!layout;
       view.maturity.textContent=view.market?apyDate(view.market.maturityDateUnixTs*1000):'No active maturity';

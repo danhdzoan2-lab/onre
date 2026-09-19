@@ -279,7 +279,11 @@
     <p id="rewardRangeStatus" hidden></p>
     <div class="table-wrapper"><table class="apy-table"><thead><tr><th>Token</th><th>Maturity</th><th>Time Left</th><th>Est. Reward APY</th><th>APY Range</th><th>Implied APY</th><th>My Limit APY</th><th>Gap</th><th>Threshold</th></tr></thead><tbody id="apyRows"></tbody></table></div>
   </section>
-  <section class="table-panel" aria-labelledby="marketTitle">
+  <div class="dashboard-tabs" role="tablist" aria-label="Dashboard sections">
+    <button id="marketTab" class="dashboard-tab" type="button" role="tab" aria-selected="true" aria-controls="marketTabPanel" tabindex="0">Market</button>
+    <button id="transactionsTab" class="dashboard-tab" type="button" role="tab" aria-selected="false" aria-controls="transactionsTabPanel" tabindex="-1">Exponent CLMM Transactions</button>
+  </div>
+  <section id="marketTabPanel" class="table-panel" role="tabpanel" aria-labelledby="marketTab marketTitle">
     <div class="panel-header"><h2 class="panel-title" id="marketTitle">Market</h2></div>
     <details class="wallet-controls"><summary>Manage wallets</summary>
       <form id="walletForm"><label for="walletAddress">Wallet address</label><input id="walletAddress" placeholder="Solana wallet address" autocomplete="off" spellcheck="false" maxlength="44" /><button type="submit">Add wallet</button><button type="button" id="refreshWalletOrders">Refresh orders</button></form>
@@ -296,7 +300,7 @@
     </div>
     <div id="marketTokens"></div>
   </section>
-  <section class="table-panel" aria-labelledby="panelTitle">
+  <section id="transactionsTabPanel" class="table-panel" role="tabpanel" aria-labelledby="transactionsTab panelTitle" hidden>
     <div class="panel-header">
       <div class="panel-heading">
         <div class="panel-kicker">Activity feed</div>
@@ -308,8 +312,8 @@
       </div>
     </div>
     <div class="table-wrapper" id="txBody"><div class="empty-state"><div><strong>Ready to load transactions</strong><p>Use the saved proxy endpoint or enter a different Worker URL, then load the latest Exponent CLMM activity.</p></div></div></div>
+    <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span id="contractFooter">Exponent CLMM XPC1…varC · all contract activity</span></footer>
   </section>
-  <footer class="footer"><span id="lastUpdate">Not yet fetched</span><span id="contractFooter">Exponent CLMM XPC1…varC · all contract activity</span></footer>
 </main>
 
 <script>
@@ -317,6 +321,27 @@
     clmm: { name: 'Exponent CLMM', address: 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC' },
     orderbook: { name: 'Exponent Orderbook', address: 'XPBookgQTN2p8Yw1C2La35XkPMmZTCEYH77AdReVvK1' }
   };
+  function setDashboardTab(name,focus=false) {
+    const market=name!=='transactions';
+    const marketButton=document.getElementById('marketTab'),transactionsButton=document.getElementById('transactionsTab');
+    marketButton.setAttribute('aria-selected',String(market));marketButton.tabIndex=market?0:-1;
+    transactionsButton.setAttribute('aria-selected',String(!market));transactionsButton.tabIndex=market?-1:0;
+    document.getElementById('marketTabPanel').hidden=!market;
+    document.getElementById('transactionsTabPanel').hidden=market;
+    if(focus)(market?marketButton:transactionsButton).focus();
+    window.marketLayout?.renderAll();
+  }
+  function updateTransactionsTabLabel() {
+    document.getElementById('transactionsTab').textContent=`${CONTRACTS[selectedContract].name} Transactions`;
+  }
+  for(const [name,button] of [['market',document.getElementById('marketTab')],['transactions',document.getElementById('transactionsTab')]]){
+    button.addEventListener('click',()=>setDashboardTab(name));
+    button.addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();
+      setDashboardTab(event.key==='ArrowLeft'||event.key==='Home'?'market':'transactions',true);
+    });
+  }
   let selectedContract = 'clmm';
   let contractRevision = 0;
   const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
@@ -614,6 +639,7 @@
     document.getElementById('trackerTitle').textContent = `${contract.name} Tracker`;
     document.getElementById('contractFooter').textContent = `${contract.name} ${sh(contract.address)} · all contract activity`;
     document.getElementById('panelTitle').textContent = getAssetFilterCopy().title;
+    updateTransactionsTabLabel();
     document.getElementById('lastUpdate').textContent = 'Not yet fetched';
     renderCurrentTransactions();
     updateNotifUI();

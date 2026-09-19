@@ -2,6 +2,7 @@
 'use strict';
 window.marketLayout=(()=>{
   const keys=['onyc','sronyc','eusx','usx','srehyusd'],views=new Map();
+  function active(){return !document.getElementById('marketTabPanel')?.hidden;}
   function get(key){
     if(views.has(key))return views.get(key);
     const root=document.getElementById('marketTokens');if(!root)return null;
@@ -18,7 +19,7 @@ window.marketLayout=(()=>{
   function sync(){
     for(const key of [...keys,...(views.has('strcx')?['strcx']:[])]){
       const v=get(key);if(!v)continue;const m=market(key);
-      v.details.hidden=selectedAssets.size>0&&!selectedAssets.has(key);
+      v.details.hidden=!active()||(selectedAssets.size>0&&!selectedAssets.has(key));
       const html=`<strong>${escapeHtml(ASSETS[key].label)}</strong><span class="book-hint">${m?escapeHtml(apyDate(m.maturityDateUnixTs*1000)):'No active market'}</span>`;
       if(v.summary.innerHTML!==html)v.summary.innerHTML=html;
     }
@@ -34,5 +35,5 @@ window.marketLayout=(()=>{
   }
   function navigate(record){const v=get(record.assetKey);if(!v)return;v.vault=record.vault;v.details.open=true;sync();}
   function renderAll(){sync();window.renderBuyBooks?.();window.renderSellBooks?.();window.renderRewardSimulations?.();}
-  return {get,market,mount,sync,navigate,renderAll,keys:()=>[...keys,...(views.has('strcx')?['strcx']:[])]};
+  return {get,market,mount,sync,navigate,renderAll,active,keys:()=>[...keys,...(views.has('strcx')?['strcx']:[])]};
 })();

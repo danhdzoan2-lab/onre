@@ -50,11 +50,11 @@ if(typeof window!=='undefined'){
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
     view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
+    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY levels';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
     if(!view.orders)return;
     const market=view.dataMarket||view.market,allGroups=sellGroups(view.orders,market,view.snapshots,view.checkedAt/1000);
     const personal=order=>{const record=typeof orderWatchRecord==='function'?orderWatchRecord(order,market,view.assetKey,'sell'):null;return !!record&&orderWatchState.records.has(orderWatchKey(record));};
     const groups=sellVisibleGroups(allGroups,view.showAll,personal),live=new Set();
-    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY levels';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
     if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=!view.showAll&&allGroups.length?(stale?'Stale · No personal sell orders in this market':'No personal sell orders in this market'):(stale?'Stale · No sell orders in last response':'No open sell orders');
     let groupIndex=0;
     for(const g of groups){

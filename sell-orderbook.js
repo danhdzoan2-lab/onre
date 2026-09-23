@@ -36,7 +36,10 @@ function sellGroups(orders,market,snapshots,now) {
     ||String(a.order.orderbook_address).localeCompare(String(b.order.orderbook_address))||(a.position?.index??Infinity)-(b.position?.index??Infinity)||String(a.order.id).localeCompare(String(b.order.id)));
   return [...groups.values()].sort((a,b)=>(a.apy??Infinity)-(b.apy??Infinity));
 }
-if(typeof module!=='undefined')module.exports={sellYtEstimate,sellOpenOrders,sellQueuePosition,sellGroups};
+function sellVisibleGroups(groups,showAll,isPersonal) {
+  return showAll?groups:groups.filter(group=>group.rows.some(row=>isPersonal(row.order)));
+}
+if(typeof module!=='undefined')module.exports={sellYtEstimate,sellOpenOrders,sellQueuePosition,sellGroups,sellVisibleGroups};
 
 if(typeof window!=='undefined'){
   const views=new Map();window.sellBookHealth=new Map();
@@ -48,8 +51,11 @@ if(typeof window!=='undefined'){
     if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
     view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
     if(!view.orders)return;
-    const groups=sellGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();
-    if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=stale?'Stale · No sell orders in last response':'No open sell orders';
+    const market=view.dataMarket||view.market,allGroups=sellGroups(view.orders,market,view.snapshots,view.checkedAt/1000);
+    const personal=order=>{const record=typeof orderWatchRecord==='function'?orderWatchRecord(order,market,view.assetKey,'sell'):null;return !!record&&orderWatchState.records.has(orderWatchKey(record));};
+    const groups=sellVisibleGroups(allGroups,view.showAll,personal),live=new Set();
+    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY levels';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
+    if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=!view.showAll&&allGroups.length?(stale?'Stale · No personal sell orders in this market':'No personal sell orders in this market'):(stale?'Stale · No sell orders in last response':'No open sell orders');
     let groupIndex=0;
     for(const g of groups){
       live.add(g.key);let node=view.groups.get(g.key);
@@ -91,7 +97,11 @@ if(typeof window!=='undefined'){
     for(const key of (layout?layout.keys():Object.keys(ASSETS))){
       const asset=ASSETS[key];
       let view=views.get(key);
-      if(!view){const details=layout?layout.mount(key,'sell'):document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');if(!layout)details.className='book-market';summary.className='market-section-title';status.className='book-status';details.append(summary,status,content);if(!layout)root.appendChild(details);view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};views.set(key,view);details.addEventListener('toggle',()=>{if(details.open){renderSellMarket(view);void refreshSellMarket(view);}});}
+      if(!view){
+        const details=layout?layout.mount(key,'sell'):document.createElement('details'),summary=document.createElement('summary'),controls=document.createElement('div'),modeText=document.createElement('span'),modeButton=document.createElement('button'),status=document.createElement('p'),content=document.createElement('div');
+        if(!layout)details.className='book-market';summary.className='market-section-title';controls.className='sell-level-filter';modeText.className='book-hint';modeButton.type='button';modeButton.addEventListener('click',()=>{view.showAll=!view.showAll;renderSellMarket(view);});controls.append(modeText,modeButton);status.className='book-status';details.append(summary,controls,status,content);if(!layout)root.appendChild(details);
+        view={assetKey:key,details,summary,controls,modeText,modeButton,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:'',showAll:false};views.set(key,view);details.addEventListener('toggle',()=>{if(details.open){renderSellMarket(view);void refreshSellMarket(view);}});
+      }
       const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
       if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}
       view.market=market;view.details.hidden=(selectedAssets.size>0&&!selectedAssets.has(key))||!!(layout&&(!layout.active()||!layout.get(key).details.open));window.sellBookHealth.set(key,{open:view.details.open&&!view.details.hidden,checkedAt:view.checkedAt,error:!!view.error});

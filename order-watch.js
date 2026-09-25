@@ -90,7 +90,7 @@ function orderWatchButton(o,market,assetKey,stale) {
 function orderWatchRowAttributes(o,market,assetKey) {
   const r=orderWatchRecord(o,market,assetKey);if(!r)return '';
   const key=orderWatchKey(r);
-  return `data-order-key="${escapeHtml(key)}" data-watched="${orderWatchState.records.has(key)}" data-order-alarm="${limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key)}"`;
+  return `data-order-key="${escapeHtml(key)}" data-watched="${orderWatchState.records.has(key)}" data-order-alarm="${limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key))}"`;
 }
 function removeOrderWatch(key) {
   orderWatchState.records.delete(key);
@@ -127,7 +127,8 @@ function renderOrderWatches() {
     node.info.textContent=`${ASSETS[r.assetKey]?.label||r.assetKey} · #${r.offerId} · ${buyOrderApy(r.rawPrice).toFixed(2)}%`;
     node.info.title=`${r.owner} · ${r.book} · ${apyDate(r.maturity*1000)}`;
     const gp=r.groupPosition;
-    node.state.textContent=gp?`Group ${gp.apy===null?'—':gp.apy.toFixed(2)+'%'}: ${gp.index} / ${gp.total}${gp.stale||Date.now()-gp.checkedAt>12000?' · Stale':''}`:(limitState.enabled?'Group position: Waiting for data':'Group position: Open market to load');
+    const positionEnabled=typeof limitOptionEnabled!=='function'||limitOptionEnabled(r.orderSide==='sell'?'sellPosition':'buyPosition');
+    node.state.textContent=gp?`Group ${gp.apy===null?'—':gp.apy.toFixed(2)+'%'}: ${gp.index} / ${gp.total}${gp.stale||Date.now()-gp.checkedAt>12000?' · Stale':''}`:(positionEnabled?'Group position: Waiting for data':'Group position alarm: Off');
     node.state.title='Display position within the APY group, not verified execution priority. '+(r.detail||'');
     node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key)));
   }
@@ -142,6 +143,8 @@ async function pollOrderWatches() {
     const messages=[],alarmKeys=[];let changed=false;
     const results=new Map();
     for(const [key,r] of entries){
+      const positionKind=r.orderSide==='sell'?'sellPosition':'buyPosition';
+      if(typeof limitOptionEnabled==='function'&&!limitOptionEnabled(positionKind))continue;
       if(orderWatchState.records.get(key)!==r)continue;
       let result;
       try{
@@ -157,7 +160,7 @@ async function pollOrderWatches() {
       if(result.front===false){if(r.front!==false||r.ack){r.front=false;r.ack=false;changed=true;}continue;}
       if(r.front!==true){r.front=true;r.ack=false;changed=true;}
       const alarmKey=orderWatchAlarmKey(key);
-      if(!r.ack&&limitState.enabled&&generation===limitAlarm.generation&&!limitAlarm.entries.has(alarmKey)){
+      if(!r.ack&&limitState.enabled&&(typeof limitOptionEnabled!=='function'||limitOptionEnabled(positionKind))&&generation===limitAlarm.generation&&!limitAlarm.entries.has(alarmKey)){
         const message=`Watched order first in APY group · ${ASSETS[r.assetKey]?.label||r.assetKey} #${r.offerId} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · Maturity ${apyDate(r.maturity*1000)}. Display position, not execution priority.`;
         limitAlarm.entries.set(alarmKey,message);messages.push(message);alarmKeys.push(alarmKey);
       }

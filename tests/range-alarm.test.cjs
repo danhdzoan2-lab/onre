@@ -5,7 +5,7 @@ const elements=new Map();const ctx=vm.createContext({Date,Map,BigInt,document:{g
  farthestApyMarket:ms=>ms[0],Notification:Object.assign(function(){notices++;},{permission:'granted'}),renderApy(){}});
 for(const file of ['limit-monitor.js','reward-range.js'])vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'..',file),'utf8'),ctx);
 const run=s=>vm.runInContext(s,ctx);
-ctx.sound=()=>{sounds++;};run(`startLimitAlarmAudio=sound;limitState.enabled=true;
+ctx.sound=()=>{sounds++;};run(`startLimitAlarmAudio=sound;limitState.enabled=true;limitState.options.buyGap=true;limitState.options.buyRange=true;
 const m={vaultAddress:'v',orderbookAddresses:['b'],maturityDateUnixTs:9999999999,impliedApy:1};apyState.markets=[m];
 const c={id:1,vaultAddress:'v',orderbookAddress:'b',campaignType:'orderbook_quote',incentivizedOrderTypes:['buyYT'],startsAt:new Date(Date.now()-1000).toISOString(),endsAt:new Date(Date.now()+1000000).toISOString(),fundingAmountRaw:'100',distributedRaw:'0',marketImpliedApy:0.02,priceBandBps:100};
 rewardRangeState.campaigns=[c];rewardRangeState.checkedAt=Date.now();const band=rewardBand(c);

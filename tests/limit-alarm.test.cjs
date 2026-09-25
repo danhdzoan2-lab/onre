@@ -11,7 +11,7 @@ const alarmRow={dataset:{},limitKey:JSON.stringify(['a',9999999999])};
 elements.set('apy-a',alarmRow);
 const quietRow={dataset:{},limitKey:JSON.stringify(['c',9999999999])};
 ctx.ASSETS.c={label:'C',mint:'c'};elements.set('apy-c',quietRow);
-run(`limitAudio=audio;limitState.enabled=true;
+run(`limitAudio=audio;limitState.enabled=true;limitState.options.buyGap=true;
 apyState.markets=['a','b'].map(mint=>({mint,vaultAddress:mint,maturityDateUnixTs:9999999999,impliedApy:.1}));
 for(const m of apyState.markets)limitState.records[limitKey(m)]={apy:'10',threshold:'0.1'};
 evaluateLimitAlerts();evaluateLimitAlerts();`);

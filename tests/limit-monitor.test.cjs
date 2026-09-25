@@ -19,7 +19,7 @@ const run = s => vm.runInContext(s, ctx);
 run(`startLimitAlarmAudio = playLimitApyAlert; limitAlarm.entries.has=()=>false; limitAlarm.entries.get=()=>undefined;`);
 for (const v of ['', ' ', '-1', 'NaN', 'Infinity', '1e4', '10x']) assert.equal(run(`limitNumber(${JSON.stringify(v)})`), null);
 assert.equal(run(`limitNumber('0')`), 0);
-run(`limitState.enabled=true;
+run(`limitState.enabled=true;limitState.options.buyGap=true;limitState.options.buyRange=true;
 apyState.markets=[{vaultAddress:'v', maturityDateUnixTs:Date.now()/1000+1000, impliedApy:.102}];
 const market=apyState.markets[0]; const key=limitKey(market);
 limitState.records[key]={apy:'10',threshold:'0.1'}; evaluateLimitAlerts();`);
@@ -34,7 +34,7 @@ run(`apyState.error=''; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
 run(`limitState.enabled=false; evaluateLimitAlerts();`);
 assert.equal(notices, 2);
-run(`limitState.enabled=true; limitState.edges.clear(); evaluateLimitAlerts();`);
+run(`limitState.enabled=true; limitState.options.buyGap=true;limitState.options.buyRange=true; limitState.edges.clear(); evaluateLimitAlerts();`);
 assert.equal(notices, 3); // Restored wallet alerts once when the signed gap is already <= threshold.
 run(`evaluateLimitAlerts()`);
 assert.equal(notices, 3);
@@ -83,7 +83,7 @@ assert.equal(tones.length,8); // Filtered crossing is not replayed.
 console.log('PASS: signed <= boundary, negative gap, invalid inputs, grouped sound, denied notification, stale data, filter replay');
 run(`limitState.enabled=false; limitState.edges.clear(); evaluateLimitAlerts();`);
 assert.equal(tones.length,8);
-run(`limitState.enabled=true; limitState.edges.clear(); apyState.error='offline'; evaluateLimitAlerts();`);
+run(`limitState.enabled=true; limitState.options.buyGap=true;limitState.options.buyRange=true; limitState.edges.clear(); apyState.error='offline'; evaluateLimitAlerts();`);
 assert.equal(tones.length,8);
 run(`apyState.error=''; evaluateLimitAlerts(); evaluateLimitAlerts();`);
 assert.equal(tones.length,12); // Enabling while already <= threshold alerts once, only with fresh data.

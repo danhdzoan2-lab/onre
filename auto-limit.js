@@ -2,6 +2,9 @@
  * in legacy settings for recovery; only the shared threshold remains editable. */
 'use strict';
 const autoLimitAlarms=new Map();
+const autoAlarmOn=name=>typeof limitOptionEnabled==='function'?limitOptionEnabled(name):limitState.enabled;
+function autoLimitAlarmKey(orderKey,kind){return 'auto-limit:'+orderKey+':'+kind;}
+function hasAutoLimitAlarm(orderKey){return [...limitAlarm.entries.keys()].some(key=>key.startsWith('auto-limit:'+orderKey+':'));}
 function autoLimitOrders(market,assetKey){
   if(!market)return [];
   return [...orderWatchState.records.entries()].filter(([,r])=>r.assetKey===assetKey&&r.vault===market.vaultAddress&&r.maturity===market.maturityDateUnixTs&&market.orderbookAddresses?.includes(r.book)&&walletMonitor.wallets.has(r.owner)&&r.expiry>Date.now()/1000&&r.maturity>Date.now()/1000)
@@ -10,6 +13,17 @@ function autoLimitOrders(market,assetKey){
 }
 function removeAutoWalletAlarms(owner){
   for(const [key,meta] of autoLimitAlarms)if(meta.owner===owner){limitAlarm.entries.delete(key);autoLimitAlarms.delete(key);}
+}
+function removeLimitOptionAlarms(name){
+  for(const [key,meta] of autoLimitAlarms)if(meta.kind===name){limitAlarm.entries.delete(key);autoLimitAlarms.delete(key);}
+  if(name==='buyPosition'||name==='sellPosition')for(const [key,r] of orderWatchState.records)if((r.orderSide==='sell'?'sellPosition':'buyPosition')===name)limitAlarm.entries.delete(orderWatchAlarmKey(key));
+  for(const r of orderWatchState.records.values()){
+    if(!r.limitEdges)continue;
+    if(name==='buyGap')delete r.limitEdges.gap;
+    if((name==='buyRange'&&r.orderSide!=='sell')||(name==='sellRange'&&r.orderSide==='sell'))delete r.limitEdges.range;
+  }
+  if(name==='buyGap'||name==='buyRange')for(const marketKey of Object.keys(limitState.records)){limitAlarm.entries.delete(marketKey);limitState.edges.delete(marketKey);limitState.edges.delete(marketKey+':range');}
+  if(!limitAlarm.entries.size)stopLimitAlarm();else renderLimitAlarm();
 }
 const renderManualLimitCells=renderLimitCells;
 renderLimitCells=function(row,assetKey,market){
@@ -57,12 +71,17 @@ function evaluateAutoLimitAlerts(fromScan=false){
       const check=(name,value,message)=>{if(value===null)return;const previous=edges[name];edges[name]=value;if(value&&previous!==true)reasons.push(message);};
       // Threshold is a buy-side proximity guard. Sell orders alert only when
       // they leave an active sellYT incentive range.
-      if(side==='buy'&&threshold!==null&&Number.isFinite(market.impliedApy))check('gap',market.impliedApy*100-apy<=threshold,'Gap ≤ '+threshold+' pp');
-      const range=typeof limitRewardRangeCheck==='function'?limitRewardRangeCheck(market,apy,side==='sell'?'sellYT':'buyYT'):null;
-      check('range',range?.outside??null,'Outside APY Range');
+      if(side==='buy'&&autoAlarmOn('buyGap')&&threshold!==null&&Number.isFinite(market.impliedApy))check('gap',market.impliedApy*100-apy<=threshold,'Gap ≤ '+threshold+' pp');else delete edges.gap;
+      const rangeKind=side==='sell'?'sellRange':'buyRange';
+      if(autoAlarmOn(rangeKind)){
+        const range=typeof limitRewardRangeCheck==='function'?limitRewardRangeCheck(market,apy,side==='sell'?'sellYT':'buyYT'):null;
+        check('range',range?.outside??null,'Outside APY Range');
+      }else delete edges.range;
       if(!reasons.length||(selectedAssets.size&&!selectedAssets.has(assetKey)))continue;
-      const alarmKey='auto-limit:'+key,message=`${side==='sell'?'Sell':'Buy'} · ${asset.label} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · ${apy.toFixed(2)}% · ${reasons.join(' · ')} · ${apyDate(r.maturity*1000)}`;
-      if(!limitAlarm.entries.has(alarmKey)){limitAlarm.entries.set(alarmKey,message);autoLimitAlarms.set(alarmKey,{owner:r.owner,marketKey});messages.push(message);}
+      for(const reason of reasons){
+        const kind=reason.startsWith('Gap')?'buyGap':rangeKind,alarmKey=autoLimitAlarmKey(key,kind),message=`${side==='sell'?'Sell':'Buy'} · ${asset.label} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · ${apy.toFixed(2)}% · ${reason} · ${apyDate(r.maturity*1000)}`;
+        if(!limitAlarm.entries.has(alarmKey)){limitAlarm.entries.set(alarmKey,message);autoLimitAlarms.set(alarmKey,{owner:r.owner,marketKey,kind});messages.push(message);}
+      }
     }
   }
   saveOrderWatches();

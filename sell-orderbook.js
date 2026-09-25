@@ -65,7 +65,7 @@ if(typeof window!=='undefined'){
       node.summary.title=stale?'Stale data':'0.1 percentage-point group · Estimated YT before fees';
       const rows=g.rows.map(({order:o,apy,yt},rowIndex)=>{
         const record=typeof orderWatchRecord==='function'?orderWatchRecord(o,view.dataMarket||view.market,view.assetKey,'sell'):null,key=record?orderWatchKey(record):'';
-        const watched=key&&orderWatchState.records.has(key),alarm=key&&(limitAlarm.entries.has(orderWatchAlarmKey(key))||limitAlarm.entries.has('auto-limit:'+key));
+        const watched=key&&orderWatchState.records.has(key),alarm=key&&(limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key)));
         if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{index:rowIndex+1,total:g.rows.length,apy:g.apy,stale,checkedAt:view.checkedAt},'sell');
         return `<tr data-order-key="${escapeHtml(key)}" data-watched="${watched}" data-order-alarm="${alarm}"><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td class="${rowIndex===0&&g.rows.length>=2?'position-first':rowIndex===1?'position-next':''}">${rowIndex+1} / ${g.rows.length}</td><td class="amount" title="Raw price: ${o.price_implied_apy}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td class="amount" title="Current order rewards estimate from Exponent">${orderRewardsText(o)}</td><td>${qty(yt)}</td></tr>`;
       }).join('');

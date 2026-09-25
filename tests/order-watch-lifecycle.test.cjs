@@ -23,21 +23,22 @@ function fixture(storage){
 (async()=>{
  const f=fixture();f.run('walletMonitor.wallets.add(owner)');await f.run('pollOrderWatches()');assert.equal(f.scans(),0,'alarm OFF does not auto poll');
  await f.run('pollOrderWatches(true)');assert.equal(f.scans(),2,'manual scan covers all maturities');assert.equal(f.run('orderWatchState.records.size'),1);assert.equal(f.sounds(),0);
- f.run('limitState.enabled=true');await f.run('pollOrderWatches()');assert.equal(f.notices(),1);await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
+ f.run('limitState.enabled=true;limitState.options.buyPosition=true');await f.run('pollOrderWatches()');assert.equal(f.notices(),1);await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
  f.run('stopLimitAlarm()');await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
- const restored=fixture(Object.fromEntries(f.saved));restored.load();await restored.run('pollOrderWatches(true)');restored.run('limitState.enabled=true');await restored.run('pollOrderWatches()');assert.equal(restored.notices(),0,'ack survives reload');
+ const restored=fixture(Object.fromEntries(f.saved));restored.load();await restored.run('pollOrderWatches(true)');restored.run('limitState.enabled=true;limitState.options.buyPosition=true');await restored.run('pollOrderWatches()');assert.equal(restored.notices(),0,'ack survives reload');
  f.ctx.mode='error';await f.run('pollOrderWatches()');assert.equal(f.run('orderWatchState.records.size'),1);assert.equal(f.run('[...orderWatchState.records.values()][0].status'),'Stale');
  f.ctx.mode='first';await f.run('pollOrderWatches()');assert.equal(f.notices(),1,'stale did not rearm');
  f.ctx.mode='behind';await f.run('pollOrderWatches()');f.ctx.mode='first';await f.run('pollOrderWatches()');assert.equal(f.notices(),2);
  f.run('stopLimitAlarm()');f.ctx.mode='solo';await f.run('pollOrderWatches()');assert.equal(f.notices(),2);f.ctx.mode='first';await f.run('pollOrderWatches()');assert.equal(f.notices(),3);
  f.ctx.mode='empty';await f.run('pollOrderWatches()');assert.equal(f.run('orderWatchState.records.size'),0);assert.equal(f.run('limitAlarm.entries.size'),1,'closed order alarm latches');
  f.run("limitAlarm.entries.set('apy','gap alarm');removeMonitorWallet(owner)");assert.equal(f.run('limitAlarm.entries.size'),1);assert.equal(f.run("limitAlarm.entries.has('apy')"),true);
- const fresh=fixture();fresh.run('walletMonitor.wallets.add(owner);limitState.enabled=true');fresh.ctx.mode='empty';await fresh.run('pollOrderWatches()');fresh.ctx.mode='first';await fresh.run('pollOrderWatches()');assert.equal(fresh.notices(),1,'discover after empty');
+ const fresh=fixture();fresh.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true');fresh.ctx.mode='empty';await fresh.run('pollOrderWatches()');fresh.ctx.mode='first';await fresh.run('pollOrderWatches()');assert.equal(fresh.notices(),1,'discover after empty');
+ const split=fixture();split.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.sellPosition=true');await split.run('pollOrderWatches()');assert.equal(split.notices(),0,'Buy Position OFF suppresses a buy position alarm');split.run('limitState.options.buyPosition=true');await split.run('pollOrderWatches()');assert.equal(split.notices(),1,'enabling Buy Position evaluates the current fresh position');
  assert.equal(fresh.run('validMonitorWallet(owner)'),true);assert.equal(fresh.run("validMonitorWallet('invalid')"),false);assert.equal(fresh.run('addMonitorWallet(owner)'),false,'duplicate rejected');
  const legacy=fixture({'exponent-watched-buy-orders-v1':JSON.stringify({records:[{owner}]})});legacy.load();assert.equal(legacy.run('walletMonitor.wallets.size'),0,'no old wallet import');
- const race=fixture();race.run('walletMonitor.wallets.add(owner);limitState.enabled=true');race.ctx.hold=true;race.ctx.apyState.markets=[market];
+ const race=fixture();race.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true');race.ctx.hold=true;race.ctx.apyState.markets=[market];
  const pending=race.run('pollOrderWatches()');race.run('removeMonitorWallet(owner)');race.ctx.release();await pending;assert.equal(race.notices(),0);assert.equal(race.run('orderWatchState.records.size'),0);
- const multi=fixture();multi.run('walletMonitor.wallets.add(owner);walletMonitor.wallets.add(other);limitState.enabled=true');
+ const multi=fixture();multi.run('walletMonitor.wallets.add(owner);walletMonitor.wallets.add(other);limitState.enabled=true;limitState.options.buyPosition=true');
  multi.ctx.apyState.markets=[market,{...market,vaultAddress:owner}];
  multi.ctx.scan=async m=>{const a={...api,user_address:m.vaultAddress===vault?owner:other,vault_address:m.vaultAddress};multi.ctx.currentApi=a;multi.ctx.currentMarket=m;
  return {market:m,checkedAt:Date.now(),records:[multi.run("orderWatchRecord(currentApi,currentMarket,'eusx')")],groups:[{apy:6.7,rows:[{order:a},{order:{...a,offer_idx:99}}]}]};};

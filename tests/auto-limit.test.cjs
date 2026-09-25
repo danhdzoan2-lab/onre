@@ -1,9 +1,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
 const market={vaultAddress:'vault',maturityDateUnixTs:Date.now()/1000+10000,orderbookAddresses:['book'],impliedApy:.075};
 const records=new Map(),entries=new Map();let saved=0;
-const ctx=vm.createContext({Date,Map,Set,Number,Math,ASSETS:{t:{mint:'mint',label:'Token'}},orderWatchState:{records,busy:false},walletMonitor:{wallets:new Set(['wallet'])},limitState:{enabled:true,records:{[JSON.stringify(['vault',market.maturityDateUnixTs])]:{apy:'999',threshold:'0.5'}}},limitAlarm:{entries},apyState:{markets:[market],checkedAt:Date.now()},selectedAssets:new Set(),
+const options={buyGap:true,buyRange:true,sellRange:true,buyPosition:true,sellPosition:true};
+const ctx=vm.createContext({Date,Map,Set,Number,Math,options,ASSETS:{t:{mint:'mint',label:'Token'}},orderWatchState:{records,busy:false},walletMonitor:{wallets:new Set(['wallet'])},limitState:{enabled:true,options,edges:new Map(),records:{[JSON.stringify(['vault',market.maturityDateUnixTs])]:{apy:'999',threshold:'0.5'}}},limitAlarm:{entries},apyState:{markets:[market],checkedAt:Date.now()},selectedAssets:new Set(),
  buyOrderApy:p=>100*Math.expm1(p/1e6),limitKey:m=>JSON.stringify([m.vaultAddress,m.maturityDateUnixTs]),limitNumber:v=>v===undefined?null:Number(v),limitGapAtOrBelow:(m,a,t)=>m-a<=t+1e-12,
  farthestApyMarket:()=>market,renderLimitCells(){},renderLimitAlarmRow(){},evaluateLimitAlerts(){},saveOrderWatches(){saved++;},apyDate:String,
+ limitOptionEnabled:name=>options[name],orderWatchAlarmKey:key=>'order-watch:'+key,stopLimitAlarm(){entries.clear();},
  limitRewardRangeCheck:(m,a)=>({outside:a<6||a>8}),startLimitAlarmAudio(){},renderLimitAlarm(){},notifyLimitAlarm(){}});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../auto-limit.js'),'utf8'),ctx);ctx.market=market;const run=s=>vm.runInContext(s,ctx);
 const order=apy=>({assetKey:'t',vault:'vault',book:'book',maturity:market.maturityDateUnixTs,expiry:market.maturityDateUnixTs,owner:'wallet',rawPrice:Math.round(Math.log1p(apy/100)*1e6),checkedAt:Date.now(),status:'Behind'});
@@ -19,4 +21,8 @@ entries.clear();records.delete('a');records.set('replacement',order(7.1));assert
 records.get('replacement').checkedAt=Date.now()-13000;assert.equal(run("autoLimitOrders(market,'t').find(o=>o.key==='replacement').stale"),true);
 run("removeAutoWalletAlarms('wallet')");assert.equal(entries.size,0);
 records.clear();assert.equal(run("autoLimitOrders(market,'t').length"),0);assert.ok(saved>0);
+records.set('gap',order(7.1));records.set('range',order(5.9));entries.clear();
+assert.equal(run('evaluateAutoLimitAlerts().length'),2);assert.ok(entries.has('auto-limit:gap:buyGap'));assert.ok(entries.has('auto-limit:range:buyRange'));
+run("options.buyGap=false;removeLimitOptionAlarms('buyGap')");assert.equal(entries.has('auto-limit:gap:buyGap'),false);assert.equal(entries.has('auto-limit:range:buyRange'),true,'disabling one option preserves other active alarms');
+records.set('sell',{...order(8.1),orderSide:'sell'});run("options.sellRange=true;evaluateAutoLimitAlerts()");assert.ok(entries.has('auto-limit:sell:sellRange'));
 console.log('PASS: automatic APY only, per-order gap/range, exact maturity, stale/Stop edges and replacement identity');

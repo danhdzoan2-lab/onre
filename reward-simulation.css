@@ -47,3 +47,7 @@ details.market-section:not([open]){padding-bottom:0}
 .dashboard-tab:focus-visible{outline:2px solid #dfbd62;outline-offset:2px}
 [role="tabpanel"][hidden]{display:none!important}
 @media(max-width:520px){.dashboard-tabs{display:grid;grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr)}.dashboard-tab{min-width:0;padding:10px 8px}}
+.alarm-option-group{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-start}
+.alarm-option-group .apy-alarm-toggle{min-height:36px;padding:7px 10px;font-size:12px}
+.alarm-option-group .apy-alarm-toggle[aria-pressed="true"]{background:#dfbd62;color:#181203;border-color:#dfbd62}
+@media(max-width:700px){.alarm-option-group{width:100%}.alarm-option-group .apy-alarm-toggle{flex:1 1 calc(50% - 7px)}}

@@ -1,5 +1,8 @@
 // Independent gap and reward-range alarm edges, sharing one latched audio loop.
-const limitState = { records: {}, edges: new Map(), enabled: false, storageError: false };
+const LIMIT_ALARM_OPTIONS = Object.freeze({buyGap:false,buyRange:false,sellRange:false,buyPosition:false,sellPosition:false});
+const LIMIT_ALARM_BUTTONS = Object.freeze({buyGap:'alarmBuyGap',buyRange:'alarmBuyRange',sellRange:'alarmSellRange',buyPosition:'alarmBuyPosition',sellPosition:'alarmSellPosition'});
+const LIMIT_ALARM_LABELS = Object.freeze({buyGap:'Buy Gap',buyRange:'Buy Range',sellRange:'Sell Range',buyPosition:'Buy Position',sellPosition:'Sell Position'});
+const limitState = { records: {}, edges: new Map(), enabled: false, options: {...LIMIT_ALARM_OPTIONS}, storageError: false };
 const LIMIT_STORAGE = 'exponent-limit-monitor-v2';
 let limitAudio = null;
 const limitAlarm = { entries: new Map(), source: null, generation: 0 };
@@ -157,9 +160,22 @@ function limitNumber(value) {
 function limitKey(market) {
   return JSON.stringify([market.vaultAddress, market.maturityDateUnixTs]);
 }
+function limitOptionEnabled(name) {
+  return limitState.options&&Object.hasOwn(limitState.options,name)?limitState.options[name]===true:limitState.enabled===true;
+}
+function syncLimitEnabled() {
+  limitState.enabled=Object.keys(LIMIT_ALARM_OPTIONS).some(limitOptionEnabled);
+  return limitState.enabled;
+}
+function renderLimitOptionButtons() {
+  for(const [name,id] of Object.entries(LIMIT_ALARM_BUTTONS)){
+    const button=document.getElementById(id);if(!button)continue;
+    const enabled=limitOptionEnabled(name);button.setAttribute('aria-pressed',String(enabled));button.textContent=`${LIMIT_ALARM_LABELS[name]}: ${enabled?'ON':'OFF'}`;
+  }
+}
 function saveLimits() {
   try {
-    localStorage.setItem(LIMIT_STORAGE, JSON.stringify({ records: limitState.records }));
+    localStorage.setItem(LIMIT_STORAGE, JSON.stringify({ records: limitState.records, alarmOptions: limitState.options }));
     limitState.storageError = false;
   } catch { limitState.storageError = true; }
   const status = document.getElementById('limitStorageStatus');
@@ -234,12 +250,14 @@ function evaluateLimitAlerts() {
       limitState.edges.set(edgeKey, triggered);
       if (triggered && previous !== true) reasons.push(reason);
     }
-    if (threshold !== null && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100)) {
+    if (limitOptionEnabled('buyGap') && threshold !== null && typeof market.impliedApy === 'number' && Number.isFinite(market.impliedApy * 100)) {
       const gap = market.impliedApy * 100 - apy;
       check(key, limitGapAtOrBelow(market.impliedApy * 100, apy, threshold), `gap ${gap >= 0 ? '+' : ''}${gap.toFixed(2)} pp; threshold ${threshold} pp`);
     } else limitState.edges.delete(key);
-    const range = typeof limitRewardRangeCheck === 'function' ? limitRewardRangeCheck(market, apy) : null;
-    check(key + ':range', range?.outside ?? null, `My Limit APY ${apy}% outside APY Range${range ? ' ' + range.label : ''}`);
+    if(limitOptionEnabled('buyRange')){
+      const range = typeof limitRewardRangeCheck === 'function' ? limitRewardRangeCheck(market, apy) : null;
+      check(key + ':range', range?.outside ?? null, `My Limit APY ${apy}% outside APY Range${range ? ' ' + range.label : ''}`);
+    }else limitState.edges.delete(key+':range');
     if (!reasons.length || !limitState.enabled || (selectedAssets.size && !selectedAssets.has(assetKey))) continue;
     const message = `${asset.label}: ${reasons.join(' · ')}. Maturity ${apyDate(market.maturityDateUnixTs * 1000)}.`;
     const existing = limitAlarm.entries.get(key);
@@ -254,12 +272,11 @@ function evaluateLimitAlerts() {
   }
 }
 if (typeof window !== 'undefined') window.addEventListener('load', () => {
-  const alarmButton = document.getElementById('limitAlerts');
-  alarmButton.title = 'Gap ≤ Threshold, My Limit APY outside APY Range, or a watched order at Group Position 1 / N. Alarm until stopped.';
   try {
     const current = localStorage.getItem(LIMIT_STORAGE);
     const saved = JSON.parse(current || '{}');
     if (saved.records && typeof saved.records === 'object' && !Array.isArray(saved.records)) limitState.records = saved.records;
+    if(saved.alarmOptions&&typeof saved.alarmOptions==='object'&&!Array.isArray(saved.alarmOptions))for(const name of Object.keys(LIMIT_ALARM_OPTIONS))limitState.options[name]=saved.alarmOptions[name]===true;
     if (!current) {
       const legacy = JSON.parse(localStorage.getItem('exponent-limit-monitor-v1') || '{}');
       for (const [key, value] of Object.entries(legacy.records || {})) {
@@ -271,17 +288,15 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
       }
     }
   } catch { /* Corrupt or unavailable storage must not prevent use. */ }
-  alarmButton.addEventListener('click', () => {
-    limitState.enabled = !limitState.enabled; limitState.edges.clear();
-    alarmButton.setAttribute('aria-pressed', String(limitState.enabled));
-    alarmButton.textContent = `APY Alarm: ${limitState.enabled ? 'ON' : 'OFF'}`;
-    if (!limitState.enabled) stopLimitAlarm();
-    if (limitState.enabled) unlockLimitAudio();
-    if (typeof pollOrderWatches === 'function') { renderOrderWatches(); void pollOrderWatches(); }
+  syncLimitEnabled();renderLimitOptionButtons();
+  for(const [name,id] of Object.entries(LIMIT_ALARM_BUTTONS))document.getElementById(id).addEventListener('click',()=>{
+    const wasEnabled=limitState.enabled;limitState.options[name]=!limitOptionEnabled(name);const optionEnabled=limitState.options[name];syncLimitEnabled();
+    if(!optionEnabled&&typeof removeLimitOptionAlarms==='function')removeLimitOptionAlarms(name);
+    limitState.edges.clear();renderLimitOptionButtons();saveLimits();
+    if(!limitState.enabled)stopLimitAlarm();else if(!wasEnabled||limitState.options[name])unlockLimitAudio();
+    if(typeof pollOrderWatches==='function'){renderOrderWatches();void pollOrderWatches();}
     updateLimitNotificationPermission();
-    if (limitState.enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().then(updateLimitNotificationPermission).catch(updateLimitNotificationPermission);
-    }
+    if(limitState.enabled&&typeof Notification!=='undefined'&&Notification.permission==='default')Notification.requestPermission().then(updateLimitNotificationPermission).catch(updateLimitNotificationPermission);
   });
   document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
   const stopButton = document.getElementById('stopLimitAlarm');

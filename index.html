@@ -254,7 +254,13 @@
   <section class="table-panel" aria-labelledby="apyTitle">
     <div class="panel-header apy-panel-header">
       <div class="panel-heading"><div class="panel-kicker">Farthest active maturity · Asia/Saigon</div><h2 class="panel-title" id="apyTitle">Market Implied APY</h2></div>
-      <div class="apy-header-controls"><button id="limitAlerts" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Gap ≤ Threshold OR My Limit APY outside APY Range">APY Alarm: OFF</button></div>
+      <div class="apy-header-controls alarm-option-group" role="group" aria-label="APY alarm options">
+        <button id="alarmBuyGap" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when Market Implied APY minus an open Buy order APY is less than or equal to its Threshold.">Buy Gap: OFF</button>
+        <button id="alarmBuyRange" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when an open buyYT order moves outside its active incentivized APY range.">Buy Range: OFF</button>
+        <button id="alarmSellRange" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when an open sellYT order moves outside its active incentivized APY range.">Sell Range: OFF</button>
+        <button id="alarmBuyPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Buy order reaches Group Position 1 / N, where N is at least 2.">Buy Position: OFF</button>
+        <button id="alarmSellPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Sell order reaches Group Position 1 / N, where N is at least 2.">Sell Position: OFF</button>
+      </div>
       <div class="asset-filter-group" role="group" aria-label="Asset filter">
         <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>
         <button id="onycFilterBtn" class="filter-button" type="button" aria-pressed="false" onclick="setAssetFilter('onyc')">ONyc</button>

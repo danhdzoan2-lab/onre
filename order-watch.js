@@ -76,6 +76,18 @@ function updateWatchGroupPosition(order,market,assetKey,position,orderSide='buy'
   const record=orderWatchRecord(order,market,assetKey,orderSide);if(!record)return;
   const watched=orderWatchState.records.get(orderWatchKey(record));if(!watched)return;
   if(watched.groupPosition?.checkedAt>position.checkedAt)return;
+  // The expanded orderbook and the background wallet scan share the same
+  // reconciled group ordering, but refresh independently. If the background
+  // scan misses a fresh "behind" snapshot, an acknowledged position alarm
+  // would otherwise remain armed as already handled and fail to fire when the
+  // order later returns to 1 / N. Any fresh source may re-arm the edge after
+  // observing that the order is no longer first; only the background scan is
+  // allowed to trigger a new alarm.
+  const firstInCompetitiveGroup=position.index===1&&position.total>=2;
+  if(!position.stale&&Number.isFinite(position.checkedAt)&&!firstInCompetitiveGroup
+    &&(watched.front!==false||watched.ack)){
+    watched.front=false;watched.ack=false;saveOrderWatches();
+  }
   watched.groupPosition=position;
   renderOrderWatches();
 }

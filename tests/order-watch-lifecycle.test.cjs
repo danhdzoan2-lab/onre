@@ -34,6 +34,15 @@ function fixture(storage){
  f.run("limitAlarm.entries.set('apy','gap alarm');removeMonitorWallet(owner)");assert.equal(f.run('limitAlarm.entries.size'),1);assert.equal(f.run("limitAlarm.entries.has('apy')"),true);
  const fresh=fixture();fresh.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true');fresh.ctx.mode='empty';await fresh.run('pollOrderWatches()');fresh.ctx.mode='first';await fresh.run('pollOrderWatches()');assert.equal(fresh.notices(),1,'discover after empty');
  const split=fixture();split.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.sellPosition=true');await split.run('pollOrderWatches()');assert.equal(split.notices(),0,'Buy Position OFF suppresses a buy position alarm');split.run('limitState.options.buyPosition=true');await split.run('pollOrderWatches()');assert.equal(split.notices(),1,'enabling Buy Position evaluates the current fresh position');
+ const sellTransition=fixture();sellTransition.ctx.sellApi={...api,order_type:'sellYT'};
+ sellTransition.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true;limitState.options.sellPosition=true');
+ sellTransition.ctx.scan=async m=>{if(m.vaultAddress==='second')return {market:m,records:[],groups:[],sellGroups:[],checkedAt:Date.now()};const a=sellTransition.ctx.sellApi;sellTransition.ctx.currentApi=a;sellTransition.ctx.currentMarket=m;const r=sellTransition.run("orderWatchRecord(currentApi,currentMarket,'eusx','sell')");return {market:m,records:[r],groups:[],sellGroups:[{apy:6.7,rows:[{order:a},{order:{...a,offer_idx:3}}]}],checkedAt:Date.now()};};
+ sellTransition.run('scanWalletMarket=scan');await sellTransition.run('pollOrderWatches()');assert.equal(sellTransition.notices(),1,'Sell Position alerts while Buy Position is also enabled');
+ sellTransition.run('stopLimitAlarm()');assert.equal(sellTransition.run('[...orderWatchState.records.values()][0].ack'),true,'Stop acknowledges the first-position sell order');
+ sellTransition.run("updateWatchGroupPosition(sellApi,market,'eusx',{index:2,total:2,apy:6.7,stale:false,checkedAt:Date.now()+1},'sell')");
+ assert.equal(sellTransition.run('[...orderWatchState.records.values()][0].ack'),false,'a fresh displayed 2/N position re-arms a missed background edge');
+ assert.equal(sellTransition.run('[...orderWatchState.records.values()][0].front'),false);
+ await sellTransition.run('pollOrderWatches()');assert.equal(sellTransition.notices(),2,'Sell Position alerts after the order returns from 2/N to 1/N');
  assert.equal(fresh.run('validMonitorWallet(owner)'),true);assert.equal(fresh.run("validMonitorWallet('invalid')"),false);assert.equal(fresh.run('addMonitorWallet(owner)'),false,'duplicate rejected');
  const legacy=fixture({'exponent-watched-buy-orders-v1':JSON.stringify({records:[{owner}]})});legacy.load();assert.equal(legacy.run('walletMonitor.wallets.size'),0,'no old wallet import');
  const race=fixture();race.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true');race.ctx.hold=true;race.ctx.apyState.markets=[market];
@@ -44,5 +53,5 @@ function fixture(storage){
  return {market:m,checkedAt:Date.now(),records:[multi.run("orderWatchRecord(currentApi,currentMarket,'eusx')")],groups:[{apy:6.7,rows:[{order:a},{order:{...a,offer_idx:99}}]}]};};
  multi.run('scanWalletMarket=scan');await multi.run('pollOrderWatches()');assert.equal(multi.notices(),1,'multiple wallet alarms coalesce');assert.equal(multi.run('limitAlarm.entries.size'),2);
  multi.run('limitState.enabled=false;removeMonitorWallet(owner)');assert.equal(multi.run('limitAlarm.entries.size'),1,'removing wallet preserves other wallet alarm');assert.equal(multi.run('[...walletMonitor.alarmOwners.values()][0]'),other);
- console.log('PASS: wallet discovery, all maturities, empty-to-new, manual/OFF, dedup, Stop/reload, stale, 1/1, removals and races');
+ console.log('PASS: wallet discovery, all maturities, empty-to-new, manual/OFF, dedup, Stop/reload, stale, 1/1, Buy/Sell coexistence, displayed 2/N re-arm, removals and races');
 })().catch(e=>{console.error(e);process.exitCode=1;});

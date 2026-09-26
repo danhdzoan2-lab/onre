@@ -1,6 +1,7 @@
 /* Read-only Farm sell-side view. One vault response is shared with the buy side;
  * same-price order is verified from the linked on-chain sell queue. */
 'use strict';
+const sellBookPosition=typeof module!=='undefined'?require('./position-groups').bookPositionLayout:bookPositionLayout;
 function sellYtEstimate(order,market) {
   const amount=buyRawAmount(order.amount_remaining);
   if(amount===null||!Number.isInteger(market.decimals)||market.decimals<0||market.decimals>18)return null;
@@ -37,7 +38,7 @@ function sellGroups(orders,market,snapshots,now) {
   return [...groups.values()].sort((a,b)=>(a.apy??Infinity)-(b.apy??Infinity));
 }
 function sellVisibleGroups(groups,showAll,isPersonal) {
-  return showAll?groups:groups.filter(group=>group.rows.some(row=>isPersonal(row.order)));
+  return showAll?groups:sellBookPosition(groups,isPersonal).focusedGroups;
 }
 if(typeof module!=='undefined')module.exports={sellYtEstimate,sellOpenOrders,sellQueuePosition,sellGroups,sellVisibleGroups};
 
@@ -50,24 +51,26 @@ if(typeof window!=='undefined'){
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
     view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
-    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY levels';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
+    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY range';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
     if(!view.orders)return;
     const market=view.dataMarket||view.market,allGroups=sellGroups(view.orders,market,view.snapshots,view.checkedAt/1000);
     const personal=order=>{const record=typeof orderWatchRecord==='function'?orderWatchRecord(order,market,view.assetKey,'sell'):null;return !!record&&orderWatchState.records.has(orderWatchKey(record));};
-    const groups=sellVisibleGroups(allGroups,view.showAll,personal),live=new Set();
+    const layout=sellBookPosition(allGroups,personal),groups=view.showAll?allGroups:layout.focusedGroups,live=new Set();
     if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=!view.showAll&&allGroups.length?(stale?'Stale · No personal sell orders in this market':'No personal sell orders in this market'):(stale?'Stale · No sell orders in last response':'No open sell orders');
     let groupIndex=0;
     for(const g of groups){
       live.add(g.key);let node=view.groups.get(g.key);
       if(!node){const details=document.createElement('details'),summary=document.createElement('summary'),scroll=document.createElement('div');details.className='book-group';scroll.className='book-scroll';details.append(summary,scroll);node={details,summary,scroll};view.groups.set(g.key,node);}
-      const summary=`<span class="amount">${g.apy===null?'—':g.apy.toFixed(2)+'%'}</span><strong>${g.unknown?'—':qty(g.total)} YT${stale?' *':''}</strong><span class="book-hint">${g.rows.length} orders</span>`;
+      const levelLabel=g.frontRange&&g.startApy!==g.endApy?`${g.startApy.toFixed(2)}%–${g.endApy.toFixed(2)}%`:g.apy===null?'—':g.apy.toFixed(2)+'%';
+      const summary=`<span class="amount">${levelLabel}</span><strong>${g.unknown?'—':qty(g.total)} YT${stale?' *':''}</strong><span class="book-hint">${g.rows.length} orders</span>`;
       if(node.summary.innerHTML!==summary)node.summary.innerHTML=summary;
-      node.summary.title=stale?'Stale data':'0.1 percentage-point group · Estimated YT before fees';
-      const rows=g.rows.map(({order:o,apy,yt},rowIndex)=>{
+      node.summary.title=stale?'Stale data':g.frontRange?'Orders from the best APY through the last personal level · Estimated YT before fees':'0.1 percentage-point group · Estimated YT before fees';
+      const rows=g.rows.map(({order:o,apy,yt})=>{
         const record=typeof orderWatchRecord==='function'?orderWatchRecord(o,view.dataMarket||view.market,view.assetKey,'sell'):null,key=record?orderWatchKey(record):'';
         const watched=key&&orderWatchState.records.has(key),alarm=key&&(limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key)));
-        if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{index:rowIndex+1,total:g.rows.length,apy:g.apy,stale,checkedAt:view.checkedAt},'sell');
-        return `<tr data-order-key="${escapeHtml(key)}" data-watched="${watched}" data-order-alarm="${alarm}"><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td class="${rowIndex===0&&g.rows.length>=2?'position-first':rowIndex===1?'position-next':''}">${rowIndex+1} / ${g.rows.length}</td><td class="amount" title="Raw price: ${o.price_implied_apy}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td class="amount" title="Current order rewards estimate from Exponent">${orderRewardsText(o)}</td><td>${qty(yt)}</td></tr>`;
+        const groupPosition=layout.positions.get(o);
+        if(typeof updateWatchGroupPosition==='function')updateWatchGroupPosition(o,view.dataMarket||view.market,view.assetKey,{...groupPosition,stale,checkedAt:view.checkedAt},'sell');
+        return `<tr data-order-key="${escapeHtml(key)}" data-watched="${watched}" data-order-alarm="${alarm}"><td><a class="sig-link" target="_blank" rel="noopener noreferrer" title="${escapeHtml(o.user_address)}" href="https://solscan.io/account/${encodeURIComponent(o.user_address)}">${escapeHtml(sh(o.user_address))}</a></td><td class="${groupPosition.index===1&&groupPosition.total>=2?'position-first':groupPosition.index===2?'position-next':''}">${groupPosition.index} / ${groupPosition.total}</td><td class="amount" title="Raw price: ${o.price_implied_apy}">${apy===null?'—':apy.toFixed(2)+'%'}</td><td class="amount" title="Current order rewards estimate from Exponent">${orderRewardsText(o)}</td><td>${qty(yt)}</td></tr>`;
       }).join('');
       const html=`<table class="book-orders"><thead><tr><th>Wallet</th><th>Group Position</th><th>Order APY</th><th>Rewards APY</th><th>Remaining YT</th></tr></thead><tbody>${rows}</tbody></table>`;
       if(node.scroll.innerHTML!==html){

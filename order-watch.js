@@ -1,6 +1,7 @@
 /* Watched orders use immutable order identities and complete on-chain books.
  * Never infer priority from rendered row order, API order, or rounded APY. */
 'use strict';
+const watchBookPosition=typeof module!=='undefined'?require('./position-groups').bookPositionLayout:bookPositionLayout;
 // Release gate: see docs/order-watch-verification.md. Do not enable without
 // recorded real-fill evidence for both price priority and linked same-price FIFO.
 const ORDER_WATCH_PRIORITY_VERIFIED = false;
@@ -72,6 +73,10 @@ function saveOrderWatches() {
   } catch { orderWatchState.storageError=true; }
 }
 function orderWatchAlarmKey(key) { return 'order-watch:'+key; }
+function groupPositionLabel(position) {
+  const first=position.startApy??position.apy,last=position.endApy??position.apy;
+  return first===last?`${last.toFixed(2)}%`:`${first.toFixed(2)}%–${last.toFixed(2)}%`;
+}
 function updateWatchGroupPosition(order,market,assetKey,position,orderSide='buy') {
   const record=orderWatchRecord(order,market,assetKey,orderSide);if(!record)return;
   const watched=orderWatchState.records.get(orderWatchKey(record));if(!watched)return;
@@ -173,7 +178,7 @@ async function pollOrderWatches() {
       if(r.front!==true){r.front=true;r.ack=false;changed=true;}
       const alarmKey=orderWatchAlarmKey(key);
       if(!r.ack&&limitState.enabled&&(typeof limitOptionEnabled!=='function'||limitOptionEnabled(positionKind))&&generation===limitAlarm.generation&&!limitAlarm.entries.has(alarmKey)){
-        const message=`Watched order first in APY group · ${ASSETS[r.assetKey]?.label||r.assetKey} #${r.offerId} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · Maturity ${apyDate(r.maturity*1000)}. Display position, not execution priority.`;
+        const message=`Watched order first in APY group · ${ASSETS[r.assetKey]?.label||r.assetKey} #${r.offerId} · Group ${groupPositionLabel(result.position)} · 1 / ${result.position.total} · Maturity ${apyDate(r.maturity*1000)}. Display position, not execution priority.`;
         limitAlarm.entries.set(alarmKey,message);messages.push(message);alarmKeys.push(alarmKey);
       }
     }
@@ -201,11 +206,18 @@ async function loadWatchedGroups(r) {
 function watchedGroupResult(r,data) {
   if(!data||Date.now()-data.checkedAt>12000)return {front:null,status:'Stale',detail:'Group data is stale'};
   if(r.expiry<=Date.now()/1000||r.maturity<=Date.now()/1000)return {front:null,status:'Inactive',detail:'Order expired'};
+  const personalRecords=data.personalRecords||[...orderWatchState.records.values(),r];
+  const personalKeys=new Set(personalRecords.filter(record=>record.vault===r.vault&&record.maturity===r.maturity&&(record.orderSide||'buy')===(r.orderSide||'buy')).map(orderWatchKey));
+  personalKeys.add(orderWatchKey(r));
+  const layout=watchBookPosition(data.groups,order=>{
+    const candidate=orderWatchRecord(order,data.market,r.assetKey,r.orderSide||'buy');
+    return !!candidate&&personalKeys.has(orderWatchKey(candidate));
+  });
   for(const g of data.groups){
     const index=g.rows.findIndex(({order})=>{const candidate=orderWatchRecord(order,data.market,r.assetKey,r.orderSide||'buy');return candidate&&orderWatchKey(candidate)===orderWatchKey(r);});
     if(index>=0&&Number.isFinite(g.apy)){
-      const hasQueueCompetition=g.rows.length>=2;
-      return {front:hasQueueCompetition&&index===0,status:index===0?(hasQueueCompetition?'First in group':'Only order in group'):'Behind in group',detail:hasQueueCompetition?'Display position only; not execution priority.':'No alarm: this APY group has only one open order.',position:{index:index+1,total:g.rows.length,apy:g.apy,checkedAt:data.checkedAt,stale:false}};
+      const position=layout.positions.get(g.rows[index].order),hasQueueCompetition=position.total>=2;
+      return {front:hasQueueCompetition&&position.index===1,status:position.index===1?(hasQueueCompetition?'First in group':'Only order in group'):'Behind in group',detail:hasQueueCompetition?'Display position only; not execution priority.':'No alarm: this group has only one open order.',position:{...position,checkedAt:data.checkedAt,stale:false}};
     }
   }
   return {front:null,status:'Inactive',detail:'Watched order not present; no replacement followed'};

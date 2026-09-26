@@ -34,7 +34,8 @@ assert.equal(groups[0].rows[0].position,null);assert.equal(groups[0].rows[1].pos
 assert.equal(groups[0].rows[0].apy.toFixed(2),groups[0].rows[1].apy.toFixed(2));
 assert.equal(buyGroups([{...order,amount_remaining:'9007199254740992'}],market,new Map(),now)[0].unknown,true);
 const personalLevel={rows:[{order:{id:1}},{order:{id:2}}]},otherLevel={rows:[{order:{id:3}}]};
-assert.deepEqual(buyVisibleGroups([personalLevel,otherLevel],false,o=>o.id===2),[personalLevel],'My levels preserves all competing orders in a personal group');
+const focused=buyVisibleGroups([personalLevel,otherLevel],false,o=>o.id===2);
+assert.equal(focused.length,1);assert.deepEqual(focused[0].rows,personalLevel.rows,'My levels includes every competing order through the personal level');
 assert.deepEqual(buyVisibleGroups([personalLevel,otherLevel],true,()=>false),[personalLevel,otherLevel]);
 assert.deepEqual(buyVisibleGroups([otherLevel],false,()=>false),[]);
 console.log('PASS: buy-side types, YT estimates, price buckets, independent exact-price queues, partial fills, ID reuse, expiry, cancellation and stale data');

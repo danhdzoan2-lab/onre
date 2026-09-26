@@ -17,7 +17,7 @@ const context={window:{addEventListener(){}},document:{createElement:()=>new Ele
  getOrderBookSnapshot:async()=>({error:''}),apyRetryDelay:()=>30000,
  setInterval:fn=>{tick=fn;},setTimeout:fn=>{timer=fn;return 1;},clearTimeout(){},
  fetch:(url,options)=>{calls++;return new Promise((resolve,reject)=>{respond=()=>resolve(response);options.signal.addEventListener('abort',()=>reject(Object.assign(Error('timeout'),{name:'AbortError'})));});}};
-vm.createContext(context);vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../buy-orderbook.js'),'utf8'),context);
+vm.createContext(context);for(const file of ['position-groups.js','buy-orderbook.js'])vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'..',file),'utf8'),context);
 context.placementOpenOrders=async()=>{const controller=new AbortController();context.setTimeout(()=>controller.abort());const r=await context.fetch('',{signal:controller.signal});if(r.status===429)throw Error('Rate limited');return r.json();};
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 (async()=>{

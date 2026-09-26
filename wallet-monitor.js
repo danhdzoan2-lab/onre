@@ -151,7 +151,7 @@ pollOrderWatches=async function(force=false){
           let r=orderWatchState.records.get(key);
           if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true,limitEdges:saved?.limitEdges||{}};orderWatchState.records.set(key,r);}
           r.apiOrderId=candidate.apiOrderId;r.remainingYt=candidate.remainingYt;r.checkedAt=data.checkedAt||0;
-          const groupData=r.orderSide==='sell'?{...data,groups:data.sellGroups||[]}:data;
+          const groupData=r.orderSide==='sell'?{...data,groups:data.sellGroups||[],personalRecords:data.records}:{...data,personalRecords:data.records};
           const result=data.error?{front:null,status:'Stale',detail:data.error}:watchedGroupResult(r,groupData);
           r.status=result.status;r.detail=result.detail;
           if(result.position)r.groupPosition=result.position;else if(r.groupPosition)r.groupPosition.stale=true;
@@ -161,7 +161,7 @@ pollOrderWatches=async function(force=false){
           if(r.front!==true){r.front=true;r.ack=false;}
           const alarmKey=orderWatchAlarmKey(key);
           if(!r.ack&&!limitAlarm.entries.has(alarmKey)){
-            const message=`${r.orderSide==='sell'?'Sell':'Buy'} · ${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Group ${result.position.apy.toFixed(2)}% · 1 / ${result.position.total} · ${apyDate(r.maturity*1000)}`;
+            const message=`${r.orderSide==='sell'?'Sell':'Buy'} · ${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Group ${groupPositionLabel(result.position)} · 1 / ${result.position.total} · ${apyDate(r.maturity*1000)}`;
             pendingAlarms.push({alarmKey,message,owner:r.owner,key,checkedAt:result.position.checkedAt});
           }
         }

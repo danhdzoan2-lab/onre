@@ -1050,6 +1050,7 @@
 <script src="orderbook.js"></script>
 <script src="order-rpc.js"></script>
 <script src="market-layout.js"></script>
+<script src="position-groups.js"></script>
 <script src="buy-orderbook.js"></script>
 <script src="sell-orderbook.js"></script>
 <script src="order-placement.js"></script>
@@ -1066,7 +1067,7 @@
  .book-status{padding:0 16px}.book-status:empty{display:none}
  .book-group{margin:0 12px 4px;border:1px solid var(--line);border-radius:5px;overflow:hidden}
  .book-group:last-child{margin-bottom:10px}
- .book-group>summary{display:grid;grid-template-columns:12px 76px 170px auto;justify-content:start;align-items:center;gap:10px;padding:7px 12px;font-size:14px;list-style:none;background:rgba(97,205,140,.045);font-variant-numeric:tabular-nums}
+ .book-group>summary{display:grid;grid-template-columns:12px max-content 170px auto;justify-content:start;align-items:center;gap:10px;padding:7px 12px;font-size:14px;list-style:none;background:rgba(97,205,140,.045);font-variant-numeric:tabular-nums}
  .book-group>summary::-webkit-details-marker{display:none}
  .book-group>summary::before{content:'▸';color:var(--muted)}
  .book-group[open]>summary::before{content:'▾'}
@@ -1104,7 +1105,7 @@
  @media(max-width:600px){#walletAddress{min-width:0;max-width:none;width:100%;flex-basis:100%}#walletForm label{width:100%}}
  .book-orders tr[data-order-alarm="true"],.order-watch-item[data-order-alarm="true"]{animation:apy-alarm-pulse 1.6s ease-in-out infinite}
  @media(prefers-reduced-motion:reduce){.book-orders tr[data-order-alarm="true"],.order-watch-item[data-order-alarm="true"]{animation:none;background:#65301f}}
- @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 6px 4px}.book-group>summary{grid-template-columns:10px 58px minmax(0,1fr) auto;justify-content:stretch;gap:6px;padding:8px;font-size:13px}.book-group>summary .book-hint{font-size:12px}.book-orders th,.book-orders td{padding:8px}}
+ @media(max-width:640px){.book-market>summary strong{display:inline-block}.book-market>summary>.book-hint{display:block;margin-left:18px}.book-hint{font-size:12px}.book-group{margin:0 6px 4px}.book-group>summary{grid-template-columns:10px minmax(0,1fr) auto;justify-content:stretch;gap:6px;padding:8px;font-size:13px}.book-group>summary .book-hint{grid-column:2 / -1;font-size:12px}.book-orders th,.book-orders td{padding:8px}}
 </style>
 <style>
   .config-card { align-items:flex-end; }

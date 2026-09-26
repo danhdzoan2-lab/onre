@@ -56,7 +56,10 @@ function buyGroups(orders,market,snapshots,now) {
     ||String(a.order.id).localeCompare(String(b.order.id)));
   return [...groups.values()].sort((a,b)=>(b.apy??-Infinity)-(a.apy??-Infinity));
 }
-if(typeof module!=='undefined')module.exports={buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups};
+function buyVisibleGroups(groups,showAll,isPersonal) {
+  return showAll?groups:groups.filter(group=>group.rows.some(row=>isPersonal(row.order)));
+}
+if(typeof module!=='undefined')module.exports={buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups,buyVisibleGroups};
 
 if(typeof window!=='undefined'){
   const buyViews=new Map();
@@ -68,9 +71,12 @@ if(typeof window!=='undefined'){
     view.status.textContent=view.error?(view.orders?'Stale · ':'')+view.error:apyState.error?'Stale · Market data unavailable':!view.orders?'Loading orders…':stale?'Stale':'';
     if(!view.dot){view.dot=document.createElement('span');view.dot.className='data-health';view.dot.setAttribute('role','img');view.details.appendChild(view.dot);}
     view.dot.dataset.fresh=String(!stale&&!!view.orders);view.dot.title=stale?'Orderbook data unavailable or outdated':'Orderbook data up to date';view.dot.setAttribute('aria-label',view.dot.title);
+    view.modeText.textContent=view.showAll?'Showing all APY levels':'Showing my APY levels';view.modeButton.textContent=view.showAll?'My levels':'Show all';view.modeButton.setAttribute('aria-pressed',String(view.showAll));
     if(!view.orders)return;
-    const groups=buyGroups(view.orders,view.dataMarket||view.market,view.snapshots,view.checkedAt/1000),live=new Set();
-    if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=stale?'Stale · No buy orders in last response':'No open buy orders';
+    const market=view.dataMarket||view.market,allGroups=buyGroups(view.orders,market,view.snapshots,view.checkedAt/1000);
+    const personal=order=>{const record=typeof orderWatchRecord==='function'?orderWatchRecord(order,market,view.assetKey,'buy'):null;return !!record&&orderWatchState.records.has(orderWatchKey(record));};
+    const groups=buyVisibleGroups(allGroups,view.showAll,personal),live=new Set();
+    if(!groups.length&&!view.error&&!apyState.error)view.status.textContent=!view.showAll&&allGroups.length?(stale?'Stale · No personal buy orders in this market':'No personal buy orders in this market'):(stale?'Stale · No buy orders in last response':'No open buy orders');
     let groupIndex=0;
     for(const g of groups){
       live.add(g.key);let node=view.groups.get(g.key);
@@ -131,9 +137,9 @@ if(typeof window!=='undefined'){
       const asset=ASSETS[key];
       let view=buyViews.get(key);
       if(!view){
-        const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement('summary'),status=document.createElement('p'),content=document.createElement('div');
-        if(!layout)details.className='book-market';summary.className='market-section-title';status.className='book-status';status.setAttribute('role','status');details.append(summary,status,content);if(!layout)root.appendChild(details);
-        view={assetKey:key,details,summary,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:''};buyViews.set(key,view);
+        const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement('summary'),controls=document.createElement('div'),modeText=document.createElement('span'),modeButton=document.createElement('button'),status=document.createElement('p'),content=document.createElement('div');
+        if(!layout)details.className='book-market';summary.className='market-section-title';controls.className='book-level-filter';modeText.className='book-hint';modeText.textContent='Showing my APY levels';modeButton.type='button';modeButton.textContent='Show all';modeButton.setAttribute('aria-pressed','false');modeButton.addEventListener('click',()=>{view.showAll=!view.showAll;renderBuyMarket(view);});controls.append(modeText,modeButton);status.className='book-status';status.setAttribute('role','status');details.append(summary,controls,status,content);if(!layout)root.appendChild(details);
+        view={assetKey:key,details,summary,controls,modeText,modeButton,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:'',showAll:false};buyViews.set(key,view);
         details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
       const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';

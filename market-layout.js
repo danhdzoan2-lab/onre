@@ -26,9 +26,8 @@ window.marketLayout=(()=>{
   }
   function mount(key,side){
     const v=get(key);if(!v)return null;if(v.sections.has(side))return v.sections.get(side);
-    const section=document.createElement(side==='simulation'?'section':'details');section.className='market-section';section.dataset.section=side;
-    // Simulation follows the token; each book is an independent, closed disclosure.
-    if(side==='simulation')Object.defineProperty(section,'open',{get:()=>v.details.open,set:()=>{}});
+    const section=document.createElement('details');section.className='market-section';section.dataset.section=side;
+    // Every section keeps its own disclosure state while sharing the token's market.
     v.sections.set(side,section);
     for(const name of ['simulation','buy','sell']){const n=v.sections.get(name);if(n)v.body.append(n);}
     return section;

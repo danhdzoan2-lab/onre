@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 global.ExponentBook=require('../orderbook');
-const {buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups}=require('../buy-orderbook');
+const {buyRawAmount,buyOrderApy,buyYtEstimate,buyOpenOrders,buyQueuePosition,buyGroups,buyVisibleGroups}=require('../buy-orderbook');
 const now=1800000000,created=now-100,expiry=now+10000;
 const market={vaultAddress:'v',orderbookAddresses:['b'],maturityDateUnixTs:now+31536000,syExchangeRate:1.02,decimals:6};
 const order={id:100,offer_idx:7,vault_address:'v',orderbook_address:'b',user_address:'wallet1',order_type:'buyYT',price_implied_apy:86177,
@@ -33,4 +33,8 @@ assert.equal(groups.length,1);assert.equal(groups[0].rows.length,3);assert.equal
 assert.equal(groups[0].rows[0].position,null);assert.equal(groups[0].rows[1].position.index,1);assert.equal(groups[0].rows[2].position.index,2);
 assert.equal(groups[0].rows[0].apy.toFixed(2),groups[0].rows[1].apy.toFixed(2));
 assert.equal(buyGroups([{...order,amount_remaining:'9007199254740992'}],market,new Map(),now)[0].unknown,true);
+const personalLevel={rows:[{order:{id:1}},{order:{id:2}}]},otherLevel={rows:[{order:{id:3}}]};
+assert.deepEqual(buyVisibleGroups([personalLevel,otherLevel],false,o=>o.id===2),[personalLevel],'My levels preserves all competing orders in a personal group');
+assert.deepEqual(buyVisibleGroups([personalLevel,otherLevel],true,()=>false),[personalLevel,otherLevel]);
+assert.deepEqual(buyVisibleGroups([otherLevel],false,()=>false),[]);
 console.log('PASS: buy-side types, YT estimates, price buckets, independent exact-price queues, partial fills, ID reuse, expiry, cancellation and stale data');

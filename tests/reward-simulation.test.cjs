@@ -21,6 +21,15 @@ assert.ok(run('simulationPoint(model,100000,.5).share>simulationPoint(model,1000
 for(const change of ["emissionRateRawPerSecond:undefined","emissionRateRawPerSecond:null","emissionRateRawPerSecond:'bad'","emissionMint:'other'","emissionDecimals:99","isActive:false","vaultAddress:'other'","orderbookAddress:'other'","endsAt:new Date(now).toISOString()","startsAt:new Date(now+1).toISOString()","priceBandBps:0","currentRewardsApy:0"])
  assert.equal(run(`simulationModel({...c,${change}},market,now)`),null,change);
 assert.ok(run("simulationModel({...c,incentivizedOrderTypes:['sellYT']},market,now)"));
+run(`const seniorMarket={...market,underlyingAsset:{mint:'FvQP1fjox2GPSwkEhENuZisz8UeRURLWf7GYF9n2mURD'}};
+const seniorCampaign={...c,id:'HmW8Pivr-HnnGv3Hr-b82f4ed7',emissionMint:'HnnGv3HrSqjRpgdFmx7vQGjntNEoex1SU4e9Lxcxuihz',emissionDecimals:6,emissionRateRawPerSecond:'1008',currentRewardsApy:80};
+const seniorModel=simulationModel(seniorCampaign,seniorMarket,now);`);
+assert.ok(run('seniorModel'),'the verified srEHYUSD campaign supports nominal eHYUSD rewards');
+assert.equal(run('simulationPoint(seniorModel,1000,.5).rewards.toFixed(2)'),'78.04');
+assert.equal(run("simulationModel({...seniorCampaign,id:'replacement'},seniorMarket,now)"),null,'a replacement campaign requires separate verification');
+assert.equal(run("simulationModel({...seniorCampaign,emissionMint:'other'},seniorMarket,now)"),null);
+assert.equal(run("simulationModel({...seniorCampaign,emissionRateRawPerSecond:null},seniorMarket,now)"),null);
+assert.equal(run("simulationModel({...seniorCampaign,endsAt:new Date(now).toISOString()},seniorMarket,now)"),null);
 assert.equal(run("simulationCampaigns([c,{...c,id:'d'}, {...c,id:'expired',endsAt:new Date(0).toISOString()}],market,now).length"),2);
 for(const v of ['', '0','-1','Infinity','1e3','bad','1000000000001']){ctx.v=v;assert.equal(run('simulationAmount(v)'),null);}
 assert.equal(run("simulationAmount('1000.5')"),1000.5);

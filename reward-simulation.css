@@ -11,6 +11,8 @@ details.market-section[open]>summary:before{content:'▾'}
 details.market-section:not([open]){padding-bottom:0}
 .sell-level-filter{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 4px 10px}
 .sell-level-filter button{min-height:34px;padding:6px 12px}
+.book-level-filter{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 4px 10px}
+.book-level-filter button{min-height:34px;padding:6px 12px}
 .market-section>.data-health{position:absolute;right:16px;top:20px}
 .market-section .sim-content{padding-left:4px;padding-right:4px}
 .sim-token{border-top:1px solid var(--line)}

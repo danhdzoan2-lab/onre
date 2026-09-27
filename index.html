@@ -190,7 +190,6 @@
       .apy-table tr[data-alarm="true"] { animation:none; background-color:#65301f; }
     }
     #limitAudioStatus:empty,#limitStorageStatus:empty,#limitNotificationStatus:empty { display:none; }
-    #enableLimitAudio{min-height:36px;margin:0 0 8px;background:#dfb94e;color:#17140b}
     @media(max-width:720px) { .settings .proxy-row { display:flex; flex-direction:column; align-items:stretch; } .notification-actions { flex-wrap:wrap; } }
   </style>
 </head>
@@ -280,7 +279,6 @@
     <p class="apy-note" id="apyStatus" role="status">Loading APY…</p>
     <div class="apy-note">
       <p id="limitAudioStatus" role="status"></p>
-      <button id="enableLimitAudio" type="button" hidden>Enable &amp; test alarm sound</button>
       <p id="limitNotificationStatus" role="status"></p>
       <p id="limitStorageStatus" role="status"></p>
       <section id="limitAlarmPanel" hidden role="alert" style="position:sticky;top:8px;z-index:20;background:#382018;border:2px solid #ffad66;border-radius:12px;padding:16px;margin:12px 0">

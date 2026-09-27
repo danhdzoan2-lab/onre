@@ -28,7 +28,7 @@ function renderLimitAlarm() {
 function startLimitAlarmAudio() {
   if (!limitAlarm.entries.size || limitAlarm.source) return;
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Alarm sound is paused. Select Enable & test alarm sound.');
+    limitAudioStatus('Alarm sound is paused. Click anywhere on the dashboard to resume.');
     // A previously unlocked context may resume without another click after sleep.
     if (limitAudio?.state === 'suspended' && typeof limitAudio.resume === 'function') void unlockLimitAudio();
     return;
@@ -52,7 +52,7 @@ function startLimitAlarmAudio() {
     source.buffer = buffer; source.loop = true; source.connect(limitAudio.destination);
     source.start(); limitAlarm.source = source;
     limitAudioStatus('');
-  } catch { limitAudioStatus('Playback failed. Check site audio permissions, then select Enable & test alarm sound.'); }
+  } catch { limitAudioStatus('Playback failed. Check site audio permissions, then click the dashboard to retry.'); }
 }
 function stopLimitAlarm() {
   if (typeof acknowledgeOrderWatches === 'function') acknowledgeOrderWatches();
@@ -76,12 +76,10 @@ function handleLimitAlarmSpace(event) {
 function limitAudioStatus(message) {
   const status = document.getElementById('limitAudioStatus');
   if (status) status.textContent = message;
-  const button = document.getElementById('enableLimitAudio');
-  if (button) button.hidden = !limitState.enabled || (limitAudio?.state === 'running' && !message);
 }
 function syncLimitAudioStatus() {
   limitAudioStatus(limitState.enabled && limitAudio?.state !== 'running'
-    ? 'Alarm sound needs a click after opening or restoring this page. Select Enable & test alarm sound.' : '');
+    ? 'Click anywhere on the dashboard to enable alarm sound for this session.' : '');
 }
 function limitNotificationStatus(message) {
   const status = document.getElementById('limitNotificationStatus');
@@ -127,18 +125,18 @@ function unlockLimitAudio() {
         if (audio.state === 'running') {
           limitAudioStatus('');
           startLimitAlarmAudio();
-        } else if (limitState.enabled) limitAudioStatus('Alarm sound is paused. Select Enable & test alarm sound.');
+        } else if (limitState.enabled) limitAudioStatus('Alarm sound is paused. Click anywhere on the dashboard to resume.');
       };
     }
     const generation = limitAlarm.generation;
     const resumed = limitAudio.resume();
-    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Allow site audio, then select Enable & test alarm sound.');
+    limitAudioStatus(limitAudio.state === 'running' ? '' : 'Allow site audio, then click the dashboard to enable alarm sound.');
     return Promise.resolve(resumed).then(() => {
       const ready = limitAudio.state === 'running';
-      limitAudioStatus(ready ? '' : 'Audio blocked. Allow site audio, then select Enable & test alarm sound.');
+      limitAudioStatus(ready ? '' : 'Audio blocked. Allow site audio, then click the dashboard to retry.');
       if (ready && generation === limitAlarm.generation) startLimitAlarmAudio();
       return ready;
-    }).catch(() => { limitAudioStatus('Cannot unlock audio. Check site sound permission, then select Enable & test alarm sound.'); return false; });
+    }).catch(() => { limitAudioStatus('Cannot unlock audio. Check site sound permission, then click the dashboard to retry.'); return false; });
   } catch {
     limitAudioStatus('Audio unsupported or blocked.');
     return Promise.resolve(false);
@@ -146,7 +144,7 @@ function unlockLimitAudio() {
 }
 function handleLimitAudioGesture(event) {
   if (!limitState.enabled || limitAudio?.state === 'running') return;
-  if (event.target?.closest?.('#enableLimitAudio, .apy-alarm-toggle, #stopLimitAlarm')) return;
+  if (event.target?.closest?.('.apy-alarm-toggle, #stopLimitAlarm')) return;
   if (event.type === 'keydown' && (event.code === 'Space' || event.key === ' ') && limitAlarm.entries.size) return;
   void unlockLimitAudio();
 }
@@ -155,7 +153,7 @@ function resumeLimitAudioOnReturn() {
 }
 function playLimitApyAlert() {
   if (!limitAudio || limitAudio.state !== 'running') {
-    limitAudioStatus('Audio not ready. Select Enable & test alarm sound.'); return;
+    limitAudioStatus('Audio not ready. Click the dashboard to enable alarm sound.'); return;
   }
   try {
     [220, 660, 880, 660].forEach((frequency, i) => {
@@ -171,7 +169,7 @@ function playLimitApyAlert() {
       oscillator.start(start); oscillator.stop(start + 0.22);
     });
     limitAudioStatus('');
-  } catch { limitAudioStatus('Audio failed. Select Enable & test alarm sound to retry.'); }
+  } catch { limitAudioStatus('Audio failed. Click the dashboard to retry.'); }
 }
 function limitGapAtOrBelow(marketPercent, manualPercent, threshold) {
   // Tolerance only removes floating-point subtraction noise at an equal boundary.
@@ -327,9 +325,6 @@ if (typeof window !== 'undefined') window.addEventListener('load', () => {
     if(limitState.enabled&&typeof Notification!=='undefined'&&Notification.permission==='default')Notification.requestPermission().then(updateLimitNotificationPermission).catch(updateLimitNotificationPermission);
   });
   document.getElementById('stopLimitAlarm').addEventListener('click', stopLimitAlarm);
-  document.getElementById('enableLimitAudio').addEventListener('click',async()=>{
-    if(await unlockLimitAudio() && !limitAlarm.entries.size)playLimitApyAlert();
-  });
   document.addEventListener?.('pointerdown',handleLimitAudioGesture,{capture:true});
   document.addEventListener?.('keydown',handleLimitAudioGesture,{capture:true});
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')resumeLimitAudioOnReturn();});

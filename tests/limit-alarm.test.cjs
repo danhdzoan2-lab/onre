@@ -36,6 +36,6 @@ run(`stopLimitAlarm();evaluateLimitAlerts();`);assert.equal(starts,2); // Still 
 run(`limitState.edges.clear();evaluateLimitAlerts();`);assert.equal(starts,3); // Explicit settings reset.
 run(`limitState.enabled=false;stopLimitAlarm();`);assert.equal(stops,3);assert.equal(run('limitAlarm.entries.size'),0);
 run(`limitAlarm.entries.set('blocked','test');audio.state='suspended';startLimitAlarmAudio();`);assert.equal(starts,3);
-assert.match(elements.get('limitAudioStatus').textContent,/locked/);
+assert.match(elements.get('limitAudioStatus').textContent,/paused/);
 run(`stopLimitAlarm();audio.state='running';startLimitAlarmAudio();`);assert.equal(starts,3);
 console.log('PASS: single 2s audio loop, grouped markets, latched recovery/errors, immediate stop, rearm, wallet switch, blocked sound');

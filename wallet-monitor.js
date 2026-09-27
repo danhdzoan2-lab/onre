@@ -192,6 +192,7 @@ pollOrderWatches=async function(force=false){
   }
 };
 function initWalletMonitor(){
+  initWalletOrderRefresh();
   try{
     const saved=JSON.parse(localStorage.getItem(WALLET_MONITOR_STORAGE)||'{}');
     for(const wallet of saved.wallets||[])if(validMonitorWallet(wallet))walletMonitor.wallets.add(wallet);
@@ -200,5 +201,4 @@ function initWalletMonitor(){
   document.getElementById('walletForm').addEventListener('submit',event=>{event.preventDefault();const input=document.getElementById('walletAddress');if(addMonitorWallet(input.value))input.value='';});
   document.getElementById('refreshWalletOrders').addEventListener('click',()=>void pollOrderWatches(true));
   walletMonitor.pending=walletMonitor.wallets.size>0;renderOrderWatches();void pollOrderWatches();
-  setInterval(()=>void pollOrderWatches(),2000);
 }

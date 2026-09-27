@@ -56,6 +56,7 @@
     .refresh-settings input { width:100%; min-height:38px; padding:8px 11px; border:1px solid var(--line); border-radius:8px; background:#090b08; color:var(--text); font:inherit; }
     #transactionRefreshStatus { flex-basis:100%; color:var(--muted); font-size:0.82rem; margin:0; }
     #transactionRefreshStatus[data-error="true"] { color:#ffb4a8; }
+    #walletOrderRefreshStatus { flex-basis:100%; color:#ffb4a8; font-size:0.82rem; margin:0; }
     .notice-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .notification-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .notification-actions button { border-color: transparent; color: #03100b; transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.16s ease; }
@@ -238,6 +239,11 @@
       <div class="field"><label for="apyRefreshSeconds">Market APY refresh (seconds)</label><input id="apyRefreshSeconds" type="number" min="2" max="3600" step="1" value="2" inputmode="numeric" aria-describedby="apyRefreshStatus" /></div>
       <button id="saveApyRefresh" type="button" class="primary-action">Save</button>
       <p id="apyRefreshStatus" role="status" aria-live="polite"></p>
+    </div>
+    <div class="refresh-settings">
+      <div class="field"><label for="walletOrderRefreshSeconds">Wallet order refresh (seconds)</label><input id="walletOrderRefreshSeconds" type="number" min="2" max="3600" step="1" value="2" inputmode="numeric" aria-describedby="walletOrderRefreshStatus" /></div>
+      <button id="saveWalletOrderRefresh" type="button" class="primary-action">Save</button>
+      <p id="walletOrderRefreshStatus" role="status" aria-live="polite"></p>
     </div></div>
     <div class="notice-row">
       <span id="volumeNote" hidden></span>
@@ -1055,6 +1061,7 @@
 <script src="sell-orderbook.js"></script>
 <script src="order-placement.js"></script>
 <script src="order-watch.js"></script>
+<script src="wallet-refresh.js"></script>
 <script src="wallet-monitor.js"></script>
 <script src="auto-limit.js"></script>
 <script src="reward-simulation.js"></script>

@@ -86,6 +86,7 @@ if(typeof window!=='undefined'){
         details.className='book-group';scroll.className='book-scroll';details.append(summary,scroll);node={details,summary,scroll};view.groups.set(g.key,node);
       }
       const levelLabel=g.frontRange&&g.startApy!==g.endApy?`${g.startApy.toFixed(2)}%–${g.endApy.toFixed(2)}%`:g.apy===null?'—':g.apy.toFixed(2)+'%';
+      if(!node.personalOpened&&g.rows.some(({order})=>personal(order))){node.details.open=true;node.personalOpened=true;}
       const summary=`<span class="amount">${levelLabel}</span><strong>${g.unknown?'—':buyQuantity(g.total)} YT${stale?' *':''}</strong><span class="book-hint">${g.rows.length} orders</span>`;
       if(node.summary.innerHTML!==summary)node.summary.innerHTML=summary;
       node.summary.title=stale?'Stale data':g.frontRange?'Orders from the best APY through the last personal level · Estimated YT before fees':'0.1 percentage-point group · Estimated YT before fees';
@@ -142,7 +143,7 @@ if(typeof window!=='undefined'){
         const details=layout?layout.mount(key,'buy'):document.createElement('details'),summary=document.createElement('summary'),controls=document.createElement('div'),modeText=document.createElement('span'),modeButton=document.createElement('button'),status=document.createElement('p'),content=document.createElement('div');
         if(!layout)details.className='book-market';summary.className='market-section-title';controls.className='book-level-filter';modeText.className='book-hint';modeText.textContent='Showing my APY levels';modeButton.type='button';modeButton.textContent='Show all';modeButton.setAttribute('aria-pressed','false');modeButton.addEventListener('click',()=>{view.showAll=!view.showAll;renderBuyMarket(view);});controls.append(modeText,modeButton);status.className='book-status';status.setAttribute('role','status');details.append(summary,controls,status,content);if(!layout)root.appendChild(details);
         view={assetKey:key,details,summary,controls,modeText,modeButton,status,content,groups:new Map(),snapshots:new Map(),orders:null,checkedAt:0,busy:false,retryAt:0,error:'',showAll:false};buyViews.set(key,view);
-        details.addEventListener('toggle',()=>{if(details.open){renderBuyMarket(view);void refreshBuyMarket(view);}});
+        details.addEventListener('toggle',()=>{if(details.open){for(const node of view.groups.values())node.personalOpened=false;renderBuyMarket(view);void refreshBuyMarket(view);}});
       }
       const market=layout?layout.market(key):(apyState.markets||[]).find(m=>view.navigationVault===m.vaultAddress&&m.maturityDateUnixTs>Date.now()/1000)||farthestApyMarket(apyState.markets||[],asset.mint,Date.now()/1000),identity=market?`${market.vaultAddress}:${market.maturityDateUnixTs}`:'';
       if(view.identity!==identity){view.identity=identity;if(!layout)view.details.open=false;view.orders=null;view.dataMarket=null;view.content.replaceChildren();view.groups.clear();view.error='';view.retryAt=0;view.checkedAt=0;view.status.textContent='';if(view.dot)view.dot.dataset.fresh='false';}

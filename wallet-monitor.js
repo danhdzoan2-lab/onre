@@ -1,7 +1,26 @@
 /* Device-local wallets. Never import legacy manually watched owners. */
 'use strict';
 const WALLET_MONITOR_STORAGE='exponent-wallet-orders-v1';
-const walletMonitor={wallets:new Set(),revision:0,pending:false,error:'',alarmOwners:new Map(),history:new Map(),walletNodes:new Map(),sellNodes:new Map()};
+const walletMonitor={wallets:new Set(),revision:0,pending:false,error:'',alarmOwners:new Map(),history:new Map(),walletNodes:new Map(),sellNodes:new Map(),marketHealth:new Map()};
+function walletHealthMaxAge(){return Math.max(12000,(typeof walletOrderRefreshSeconds==='number'?walletOrderRefreshSeconds:2)*1000+8000);}
+function walletMarketHealth(vault,record){
+  if(!walletMonitor.wallets.size)return null;
+  const health=walletMonitor.marketHealth.get(vault),now=Date.now(),maxAge=walletHealthMaxAge();
+  const apyFresh=!!apyState.checkedAt&&!apyState.error&&now-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000);
+  const fresh=apyFresh&&health?.revision===walletMonitor.revision&&!!health.checkedAt&&!health.error&&now-health.checkedAt<=maxAge&&(!record||record.status!=='Stale'&&!!record.checkedAt&&now-record.checkedAt<=maxAge);
+  return {fresh,title:fresh?'Data up to date':'Data unavailable or outdated'};
+}
+function setPersonalTokenCell(cell,record){
+  if(!cell.tokenLabel){
+    cell.tokenLabel=document.createElement('span');cell.tokenDot=document.createElement('span');
+    cell.tokenDot.className='data-health token-health';cell.tokenDot.setAttribute('role','img');
+    cell.append(cell.tokenLabel,cell.tokenDot);
+  }
+  cell.tokenLabel.textContent=ASSETS[record.assetKey]?.label||record.assetKey;
+  const health=walletMarketHealth(record.vault,record);
+  cell.tokenDot.hidden=!health;
+  if(health){cell.tokenDot.dataset.fresh=String(health.fresh);cell.tokenDot.title=health.title;cell.tokenDot.setAttribute('aria-label',`${cell.tokenLabel.textContent}: ${health.title}`);}
+}
 function validMonitorWallet(value){
   try{return typeof value==='string'&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)&&ExponentBook.unbase58(value).length===32;}catch{return false;}
 }
@@ -47,16 +66,6 @@ function removeMonitorWallet(wallet){
   if(walletMonitor.wallets.size){walletMonitor.pending=true;void pollOrderWatches(true);}
 }
 renderOrderWatches=function(){
-  const dot=document.getElementById('bookDataHealth');
-  if(dot){
-    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].filter(r=>(r.orderSide||'buy')==='buy').every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&(!walletMonitor.wallets.size||!!walletMonitor.checkedAt&&Date.now()-walletMonitor.checkedAt<=12000)&&!(typeof window!=='undefined'&&window.buyBookHealth&&[...window.buyBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
-    dot.dataset.fresh=String(fresh);dot.title=fresh?'Data up to date':'Data unavailable or outdated';dot.setAttribute('aria-label',dot.title);
-  }
-  const sellDot=document.getElementById('sellBookDataHealth');
-  if(sellDot){
-    const fresh=!!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=(typeof apyMaxAge==='function'?apyMaxAge():12000)&&!walletMonitor.scanError&&[...orderWatchState.records.values()].filter(r=>r.orderSide==='sell').every(r=>r.status!=='Stale'&&r.checkedAt&&Date.now()-r.checkedAt<=12000)&&!(window.sellBookHealth&&[...window.sellBookHealth.values()].some(v=>v.open&&(!v.checkedAt||v.error||Date.now()-v.checkedAt>12000)));
-    sellDot.dataset.fresh=String(fresh);sellDot.title=fresh?'Data up to date':'Data unavailable or outdated';sellDot.setAttribute('aria-label',sellDot.title);
-  }
   const root=document.getElementById('watchedBuyOrders');if(!root)return;
   const buyRecords=[...orderWatchState.records].filter(([,r])=>(r.orderSide||'buy')==='buy');
   root.hidden=!buyRecords.length;
@@ -86,7 +95,8 @@ renderOrderWatches=function(){
     const p=r.groupPosition;
     const yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
     const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}`:'—',buyOrderApy(r.rawPrice).toFixed(2)+'%',orderRewardsText(r),yt];
-    node.cellsList.forEach((cell,i)=>{if(cell.textContent!==values[i])cell.textContent=values[i];});
+    setPersonalTokenCell(node.cellsList[0],r);
+    node.cellsList.forEach((cell,i)=>{if(i&&cell.textContent!==values[i])cell.textContent=values[i];});
     node.cellsList[2].title=r.owner;node.cellsList[4].className='amount';node.cellsList[3].title='';node.cellsList[5].title='';
     node.cellsList[3].className=p?.index===1&&p.total>=2?'position-first':p?.index===2?'position-next':'';
     node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key)));
@@ -104,7 +114,8 @@ function renderPersonalSellOrders(){
     if(!node){node=document.createElement('tr');node.cellsList=Array.from({length:7},()=>document.createElement('td'));node.append(...node.cellsList);node.tabIndex=0;node.title='Open this order in Sell Orderbook';const open=()=>window.openPersonalSellOrder?.(key);node.addEventListener('click',open);node.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();open();}});walletMonitor.sellNodes.set(key,node);}
     const p=r.groupPosition,yt=Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
     const values=[ASSETS[r.assetKey]?.label||r.assetKey,apyDate(r.maturity*1000),r.owner.slice(0,6)+'…'+r.owner.slice(-4),p?`${p.index} / ${p.total}`:'—',buyOrderApy(r.rawPrice).toFixed(2)+'%',orderRewardsText(r),yt];
-    node.cellsList.forEach((cell,i)=>cell.textContent=values[i]);node.cellsList[2].title=r.owner;node.cellsList[3].className=p?.index===1&&p.total>=2?'position-first':p?.index===2?'position-next':'';node.cellsList[4].className='amount';node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key)));
+    setPersonalTokenCell(node.cellsList[0],r);
+    node.cellsList.forEach((cell,i)=>{if(i&&cell.textContent!==values[i])cell.textContent=values[i];});node.cellsList[2].title=r.owner;node.cellsList[3].className=p?.index===1&&p.total>=2?'position-first':p?.index===2?'position-next':'';node.cellsList[4].className='amount';node.dataset.orderAlarm=String(limitAlarm.entries.has(orderWatchAlarmKey(key))||(typeof hasAutoLimitAlarm==='function'&&hasAutoLimitAlarm(key)));
     if(list.children[index]!==node)list.insertBefore(node,list.children[index]||null);index++;
   }
   for(const [key,node] of walletMonitor.sellNodes)if(!orderWatchState.records.has(key)){node.remove();walletMonitor.sellNodes.delete(key);}
@@ -142,9 +153,10 @@ pollOrderWatches=async function(force=false){
       for(let j=0;j<results.length;j++){
         const outcome=results[j],{market}=batch[j];
         if(outcome.status==='rejected'){
-          errors++;for(const r of orderWatchState.records.values())if(r.vault===market.vaultAddress){r.status='Stale';if(r.groupPosition)r.groupPosition.stale=true;}continue;
+          errors++;walletMonitor.marketHealth.set(market.vaultAddress,{checkedAt:0,error:true,revision});for(const r of orderWatchState.records.values())if(r.vault===market.vaultAddress){r.status='Stale';if(r.groupPosition)r.groupPosition.stale=true;}continue;
         }
         const data=outcome.value,live=new Set();if(data.error)errors++;
+        walletMonitor.marketHealth.set(market.vaultAddress,{checkedAt:data.checkedAt||0,error:!!data.error,revision});
         for(const candidate of data.records){
           if(!walletMonitor.wallets.has(candidate.owner))continue;
           const key=orderWatchKey(candidate);live.add(key);

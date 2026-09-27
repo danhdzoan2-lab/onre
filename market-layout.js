@@ -20,7 +20,9 @@ window.marketLayout=(()=>{
     for(const key of [...keys,...(views.has('strcx')?['strcx']:[])]){
       const v=get(key);if(!v)continue;const m=market(key);
       v.details.hidden=!active()||(selectedAssets.size>0&&!selectedAssets.has(key));
-      const html=`<strong>${escapeHtml(ASSETS[key].label)}</strong><span class="book-hint">${m?escapeHtml(apyDate(m.maturityDateUnixTs*1000)):'No active market'}</span>`;
+      const health=m&&typeof walletMarketHealth==='function'?walletMarketHealth(m.vaultAddress):null;
+      const healthHtml=health?`<span class="data-health token-health" data-fresh="${health.fresh}" role="img" aria-label="${escapeHtml(ASSETS[key].label+': '+health.title)}" title="${escapeHtml(health.title)}"></span>`:'';
+      const html=`<strong>${escapeHtml(ASSETS[key].label)}</strong><span class="book-hint">${m?escapeHtml(apyDate(m.maturityDateUnixTs*1000)):'No active market'}</span>${healthHtml}`;
       if(v.summary.innerHTML!==html)v.summary.innerHTML=html;
     }
   }

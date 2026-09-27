@@ -18,11 +18,22 @@ function fixture(storage){
  const r=run("orderWatchRecord(api,market,'eusx')"),competitor={order:{...api,offer_idx:3}};
  return {market:m,records:[r],checkedAt:Date.now(),groups:[{apy:6.7,rows:ctx.mode==='solo'?[{order:api}]:ctx.mode==='behind'?[competitor,{order:api}]:[{order:api},competitor]}]};};
  run('scanWalletMarket=scan;startLimitAlarmAudio=sound;notifyLimitAlarm=notice;');
- return {ctx,run,load:()=>load(),saved,scans:()=>scans,sounds:()=>sounds,notices:()=>notices};
+ return {ctx,run,load:()=>load(),saved,nodes,scans:()=>scans,sounds:()=>sounds,notices:()=>notices};
 }
 (async()=>{
  const f=fixture();f.run('walletMonitor.wallets.add(owner)');await f.run('pollOrderWatches()');assert.equal(f.scans(),0,'alarm OFF does not auto poll');
  await f.run('pollOrderWatches(true)');assert.equal(f.scans(),2,'manual scan covers all maturities');assert.equal(f.run('orderWatchState.records.size'),1);assert.equal(f.sounds(),0);
+ assert.equal(f.nodes.get('orderWatchList').children[0].cellsList[0].tokenDot.dataset.fresh,'true','personal order shows its own market health');
+ const health=fixture();health.run('walletMonitor.wallets.add(owner)');await health.run('pollOrderWatches(true)');
+ health.run("scanWalletMarket=async m=>m.vaultAddress===market.vaultAddress?Promise.reject(Error('offline')):{market:m,records:[],groups:[],checkedAt:Date.now()}");
+ await health.run('pollOrderWatches(true)');
+ assert.equal(health.run('walletMarketHealth(market.vaultAddress).fresh'),false,'failed vault becomes unavailable');
+ assert.equal(health.run("walletMarketHealth('second').fresh"),true,'healthy vault stays fresh despite another vault failing');
+ assert.equal(health.nodes.get('orderWatchList').children[0].cellsList[0].tokenDot.dataset.fresh,'false','personal row reflects its own vault only');
+ health.run("walletOrderRefreshSeconds=30;walletMonitor.marketHealth.set('second',{checkedAt:Date.now()-13000,error:false,revision:walletMonitor.revision})");
+ assert.equal(health.run("walletMarketHealth('second').fresh"),true,'health follows the saved wallet scan cadence');
+ health.run("walletMonitor.marketHealth.get('second').checkedAt=Date.now()-39000");
+ assert.equal(health.run("walletMarketHealth('second').fresh"),false,'overdue wallet data is marked outdated');
  f.run('limitState.enabled=true;limitState.options.buyPosition=true');await f.run('pollOrderWatches()');assert.equal(f.notices(),1);await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
  f.run('stopLimitAlarm()');await f.run('pollOrderWatches()');assert.equal(f.notices(),1);
  const restored=fixture(Object.fromEntries(f.saved));restored.load();await restored.run('pollOrderWatches(true)');restored.run('limitState.enabled=true;limitState.options.buyPosition=true');await restored.run('pollOrderWatches()');assert.equal(restored.notices(),0,'ack survives reload');

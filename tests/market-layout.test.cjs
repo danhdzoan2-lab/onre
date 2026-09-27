@@ -13,6 +13,10 @@ vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../mark
 const layout=c.window.marketLayout;layout.sync();
 assert.deepEqual(root.children.map(n=>n.dataset.token),keys.slice(0,5));
 assert.ok(root.children.every(n=>!n.open));
+c.walletMarketHealth=vault=>({fresh:vault==='sronyc2',title:vault==='sronyc2'?'Data up to date':'Data unavailable or outdated'});
+layout.sync();
+assert.match(layout.get('sronyc').summary.innerHTML,/data-fresh="true"/,'token header uses the selected vault');
+assert.match(layout.get('eusx').summary.innerHTML,/data-fresh="false"/,'other token stays independent');
 const token=layout.get('sronyc'),buy=layout.mount('sronyc','buy'),sell=layout.mount('sronyc','sell'),sim=layout.mount('sronyc','simulation');
 assert.deepEqual(token.body.children.map(n=>n.dataset.section),['simulation','buy','sell']);
 token.details.open=true;assert.ok(!buy.open&&!sell.open&&!sim.open,'Simulation starts collapsed independently');
@@ -21,6 +25,7 @@ buy.open=true;assert.ok(buy.open&&!sell.open,'Books expand independently');
 layout.sync();assert.ok(sim.open&&buy.open&&!sell.open,'Refresh preserves disclosure state');
 layout.sync();assert.equal(token.details.open,true);assert.equal(layout.market('sronyc').vaultAddress,'sronyc2');
 layout.navigate({assetKey:'sronyc',vault:'sronyc1'});assert.equal(layout.market('sronyc').vaultAddress,'sronyc1');
+assert.match(token.summary.innerHTML,/data-fresh="false"/,'switching maturity updates token health');
 c.selectedAssets.add('eusx');layout.sync();assert.ok(token.details.hidden);assert.ok(token.details.open);
 c.selectedAssets.clear();layout.sync();assert.equal(token.details.hidden,false);
 token.details.open=false;assert.equal(buy.open,true);assert.equal(sell.open,false);assert.equal(sim.open,true,'Collapsing token retains simulation state');

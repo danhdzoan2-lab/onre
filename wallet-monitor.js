@@ -3,6 +3,33 @@
 const WALLET_MONITOR_STORAGE='exponent-wallet-orders-v1';
 const walletMonitor={wallets:new Set(),revision:0,pending:false,error:'',alarmOwners:new Map(),history:new Map(),walletNodes:new Map(),sellNodes:new Map(),marketHealth:new Map()};
 function walletHealthMaxAge(){return Math.max(12000,(typeof walletOrderRefreshSeconds==='number'?walletOrderRefreshSeconds:2)*1000+8000);}
+function validWalletFillState(value){
+  return value&&typeof value.remaining==='string'&&/^\d{1,20}$/.test(value.remaining)&&BigInt(value.remaining)>0n&&BigInt(value.remaining)<=18446744073709551615n&&Number.isSafeInteger(value.slot)&&value.slot>0;
+}
+function walletHistoryRecord(r){return {owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry,limitEdges:r.limitEdges,fillState:r.fillState};}
+function attachWalletFillEvidence(records,groups,snapshots,market){
+  const byKey=new Map(records.map(r=>[orderWatchKey(r),r]));
+  for(const group of groups)for(const row of group.rows){
+    if(!row.position)continue; // Queue validation checks identity and exact remaining amount on-chain.
+    const side=row.order.order_type==='sellYT'?'sell':'buy';
+    const candidate=orderWatchRecord(row.order,market,'proof',side);if(!candidate)continue;
+    const record=byKey.get(orderWatchKey(candidate)),snapshot=snapshots.get(row.order.orderbook_address);
+    const amount=row.order.amount_remaining;
+    if(!record||!snapshot||snapshot.error||Date.now()-snapshot.checkedAt>12000||typeof amount==='number'&&!Number.isSafeInteger(amount))continue;
+    const evidence={remaining:String(amount),slot:snapshot.slot};
+    if(validWalletFillState(evidence)&&BigInt(evidence.remaining)<=BigInt(record.original))record.fillEvidence=evidence;
+  }
+}
+function walletPartialFill(r,evidence,enabled){
+  if(!validWalletFillState(evidence)||BigInt(evidence.remaining)>BigInt(r.original))return false;
+  const previous=r.fillState;
+  if(!validWalletFillState(previous)){r.fillState=evidence;return false;}
+  if(evidence.slot<=previous.slot)return false;
+  // Never raise the baseline on inconsistent/increased quantities.
+  if(BigInt(evidence.remaining)>BigInt(previous.remaining))return false;
+  if(enabled&&BigInt(evidence.remaining)<BigInt(previous.remaining))return true;
+  r.fillState=evidence;return false;
+}
 function walletMarketHealth(vault,record){
   if(!walletMonitor.wallets.size)return null;
   const health=walletMonitor.marketHealth.get(vault),now=Date.now(),maxAge=walletHealthMaxAge();
@@ -33,7 +60,7 @@ function walletMarkets(markets,now=Date.now()/1000){
 }
 saveOrderWatches=function(){
   try{
-    for(const [key,r] of orderWatchState.records)walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry,limitEdges:r.limitEdges});
+    for(const [key,r] of orderWatchState.records)walletMonitor.history.set(key,walletHistoryRecord(r));
     for(const [key,r] of walletMonitor.history)if(!walletMonitor.wallets.has(r.owner)||r.expiry<Date.now()/1000)walletMonitor.history.delete(key);
     localStorage.setItem(WALLET_MONITOR_STORAGE,JSON.stringify({wallets:[...walletMonitor.wallets],history:[...walletMonitor.history]}));
     orderWatchState.storageError=false;
@@ -130,7 +157,9 @@ async function scanWalletMarket(market,assetKey){
     const snapshots=new Map(await Promise.all(market.orderbookAddresses.map(async address=>[address,await getOrderBookSnapshot(address)])));
     const buyReconciled=await reconcileBuyOrders(orders,market,snapshots),sellReconciled=await reconcileSellOrders(orders,market,snapshots);
     if(Date.now()-ordersAt>12000||[...snapshots.values()].some(s=>s.error||Date.now()-s.checkedAt>12000))throw Error('Orderbook data is stale');
-    return {market,records,groups:buyGroups(buyReconciled,market,snapshots,Date.now()/1000),sellGroups:sellGroups(sellReconciled,market,snapshots,Date.now()/1000),checkedAt:Date.now()};
+    const groups=buyGroups(buyReconciled,market,snapshots,Date.now()/1000),sell= sellGroups(sellReconciled,market,snapshots,Date.now()/1000);
+    attachWalletFillEvidence(records,[...groups,...sell],snapshots,market);
+    return {market,records,groups,sellGroups:sell,checkedAt:Date.now()};
   }catch(e){return {market,records,error:e.message};}
 }
 pollOrderWatches=async function(force=false){
@@ -165,26 +194,33 @@ pollOrderWatches=async function(force=false){
           if(!walletMonitor.wallets.has(candidate.owner))continue;
           const key=orderWatchKey(candidate);live.add(key);
           let r=orderWatchState.records.get(key);
-          if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true,limitEdges:saved?.limitEdges||{}};orderWatchState.records.set(key,r);}
+          if(!r){const saved=walletMonitor.history.get(key);r={...candidate,front:saved?.front??null,ack:saved?.ack===true,limitEdges:saved?.limitEdges||{},fillState:saved?.fillState};orderWatchState.records.set(key,r);}
           r.apiOrderId=candidate.apiOrderId;r.remainingYt=candidate.remainingYt;r.checkedAt=data.checkedAt||0;
           const groupData=r.orderSide==='sell'?{...data,groups:data.sellGroups||[],personalRecords:data.records}:{...data,personalRecords:data.records};
           const result=data.error?{front:null,status:'Stale',detail:data.error}:watchedGroupResult(r,groupData);
           r.status=result.status;r.detail=result.detail;
           if(result.position)r.groupPosition=result.position;else if(r.groupPosition)r.groupPosition.stale=true;
           const positionKind=r.orderSide==='sell'?'sellPosition':'buyPosition';
+          const enabled=limitState.enabled&&(typeof limitOptionEnabled!=='function'||limitOptionEnabled(positionKind));
+          if(!data.error&&data.checkedAt&&Date.now()-data.checkedAt<=12000&&walletPartialFill(r,candidate.fillEvidence,enabled)){
+            const original=BigInt(r.original),remaining=BigInt(candidate.fillEvidence.remaining);
+            const filledPercent=(Number((original-remaining)*10000n/original)/100).toFixed(2);
+            const message=`${r.orderSide==='sell'?'Sell':'Buy'} · ${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Partially filled · ${filledPercent}% of original filled · Order APY ${buyOrderApy(r.rawPrice).toFixed(2)}% · ${apyDate(r.maturity*1000)}`;
+            pendingAlarms.push({alarmKey:orderWatchAlarmKey(key),message,owner:r.owner,key,checkedAt:data.checkedAt,fillEvidence:candidate.fillEvidence,positionKind});
+          }
           if(!limitState.enabled||(typeof limitOptionEnabled==='function'&&!limitOptionEnabled(positionKind))||generation!==limitAlarm.generation||result.front===null)continue;
           if(!result.front){r.front=false;r.ack=false;continue;}
           if(r.front!==true){r.front=true;r.ack=false;}
           const alarmKey=orderWatchAlarmKey(key);
           if(!r.ack&&!limitAlarm.entries.has(alarmKey)){
             const message=`${r.orderSide==='sell'?'Sell':'Buy'} · ${ASSETS[r.assetKey].label} #${r.offerId} · ${r.owner.slice(0,6)}…${r.owner.slice(-4)} · Group ${groupPositionLabel(result.position)} · 1 / ${result.position.total} · ${apyDate(r.maturity*1000)}`;
-            pendingAlarms.push({alarmKey,message,owner:r.owner,key,checkedAt:result.position.checkedAt});
+            pendingAlarms.push({alarmKey,message,owner:r.owner,key,checkedAt:result.position.checkedAt,positionKind});
           }
         }
         // Successful open-order response is authoritative for removals even
         // when the separate queue read failed. Latched alarms remain until Stop.
         for(const [key,r] of orderWatchState.records)if(r.vault===market.vaultAddress&&!live.has(key)){
-          walletMonitor.history.set(key,{owner:r.owner,front:r.front,ack:r.ack,expiry:r.expiry,limitEdges:r.limitEdges});orderWatchState.records.delete(key);
+          walletMonitor.history.set(key,walletHistoryRecord(r));orderWatchState.records.delete(key);
         }
       }
     }
@@ -193,9 +229,11 @@ pollOrderWatches=async function(force=false){
     if(!errors)walletMonitor.checkedAt=Date.now();
     saveOrderWatches();
     if(limitState.enabled&&generation===limitAlarm.generation){
-      for(const a of pendingAlarms)if(walletMonitor.wallets.has(a.owner)&&orderWatchState.records.has(a.key)&&Date.now()-a.checkedAt<=12000&&!limitAlarm.entries.has(a.alarmKey)){
+      for(const a of pendingAlarms)if(walletMonitor.wallets.has(a.owner)&&orderWatchState.records.has(a.key)&&Date.now()-a.checkedAt<=12000&&(typeof limitOptionEnabled!=='function'||limitOptionEnabled(a.positionKind))&&(a.fillEvidence||!limitAlarm.entries.has(a.alarmKey))){
+        if(a.fillEvidence)orderWatchState.records.get(a.key).fillState=a.fillEvidence;
         limitAlarm.entries.set(a.alarmKey,a.message);walletMonitor.alarmOwners.set(a.alarmKey,a.owner);messages.push(a.message);alarmKeys.push(a.alarmKey);
       }
+      saveOrderWatches();
       if(typeof evaluateAutoLimitAlerts==='function')messages.push(...evaluateAutoLimitAlerts(true));
       if(messages.length){startLimitAlarmAudio();renderLimitAlarm();void notifyLimitAlarm(messages.join('\n'));}
     }
@@ -212,7 +250,7 @@ function initWalletMonitor(){
   try{
     const saved=JSON.parse(localStorage.getItem(WALLET_MONITOR_STORAGE)||'{}');
     for(const wallet of saved.wallets||[])if(validMonitorWallet(wallet))walletMonitor.wallets.add(wallet);
-    for(const entry of saved.history||[]){if(!Array.isArray(entry)||entry.length!==2)continue;const [key,r]=entry;if(typeof key==='string'&&r&&walletMonitor.wallets.has(r.owner)&&Number.isFinite(r.expiry))walletMonitor.history.set(key,{owner:r.owner,expiry:r.expiry,ack:r.ack===true,front:typeof r.front==='boolean'?r.front:null,limitEdges:r.limitEdges&&typeof r.limitEdges==='object'?r.limitEdges:{}});}
+    for(const entry of saved.history||[]){if(!Array.isArray(entry)||entry.length!==2)continue;const [key,r]=entry;if(typeof key==='string'&&r&&walletMonitor.wallets.has(r.owner)&&Number.isFinite(r.expiry))walletMonitor.history.set(key,{owner:r.owner,expiry:r.expiry,ack:r.ack===true,front:typeof r.front==='boolean'?r.front:null,limitEdges:r.limitEdges&&typeof r.limitEdges==='object'?r.limitEdges:{},fillState:validWalletFillState(r.fillState)?r.fillState:undefined});}
   }catch{orderWatchState.storageError=true;}
   document.getElementById('walletForm').addEventListener('submit',event=>{event.preventDefault();const input=document.getElementById('walletAddress');if(addMonitorWallet(input.value))input.value='';});
   document.getElementById('refreshWalletOrders').addEventListener('click',()=>void pollOrderWatches(true));

@@ -264,8 +264,8 @@
         <button id="alarmBuyGap" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when Market Implied APY minus an open Buy order APY is less than or equal to its Threshold.">Buy Gap: OFF</button>
         <button id="alarmBuyRange" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when an open buyYT order moves outside its active incentivized APY range.">Buy Range: OFF</button>
         <button id="alarmSellRange" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when an open sellYT order moves outside its active incentivized APY range.">Sell Range: OFF</button>
-        <button id="alarmBuyPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Buy order reaches Group Position 1 / N, where N is at least 2.">Buy Position: OFF</button>
-        <button id="alarmSellPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Sell order reaches Group Position 1 / N, where N is at least 2.">Sell Position: OFF</button>
+        <button id="alarmBuyPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Buy order reaches Group Position 1 / N (N at least 2), or a fresh on-chain check confirms its remaining amount decreased while still open. Partial fills also alert in a 1 / 1 group.">Buy Position: OFF</button>
+        <button id="alarmSellPosition" class="filter-button apy-alarm-toggle" type="button" aria-pressed="false" title="Alerts when a tracked Sell order reaches Group Position 1 / N (N at least 2), or a fresh on-chain check confirms its remaining amount decreased while still open. Partial fills also alert in a 1 / 1 group.">Sell Position: OFF</button>
       </div>
       <div class="asset-filter-group" role="group" aria-label="Asset filter">
         <button id="allFilterBtn" class="filter-button" type="button" aria-pressed="true" onclick="setAssetFilter('all')">All</button>

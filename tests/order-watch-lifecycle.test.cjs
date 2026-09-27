@@ -68,5 +68,32 @@ function fixture(storage){
  return {market:m,checkedAt:Date.now(),records:[multi.run("orderWatchRecord(currentApi,currentMarket,'eusx')")],groups:[{apy:6.7,rows:[{order:a},{order:{...a,offer_idx:99}}]}]};};
  multi.run('scanWalletMarket=scan');await multi.run('pollOrderWatches()');assert.equal(multi.notices(),1,'multiple wallet alarms coalesce');assert.equal(multi.run('limitAlarm.entries.size'),2);
  multi.run('limitState.enabled=false;removeMonitorWallet(owner)');assert.equal(multi.run('limitAlarm.entries.size'),1,'removing wallet preserves other wallet alarm');assert.equal(multi.run('[...walletMonitor.alarmOwners.values()][0]'),other);
- console.log('PASS: wallet discovery, all maturities, empty-to-new, manual/OFF, dedup, Stop/reload, stale, 1/1, Buy/Sell coexistence, displayed 2/N re-arm, removals and races');
+ const proof=fixture();proof.run("proofRecord=orderWatchRecord(api,market,'eusx');proofRow={order:{...api,amount_remaining:'400'},position:null};proofSnapshots=new Map([[api.orderbook_address,{slot:123,checkedAt:Date.now()}]]);attachWalletFillEvidence([proofRecord],[{rows:[proofRow]}],proofSnapshots,market)");
+ assert.equal(proof.run('proofRecord.fillEvidence'),undefined,'API amount without on-chain queue verification cannot establish fill evidence');
+ proof.run('proofRow.position={index:1,total:1};attachWalletFillEvidence([proofRecord],[{rows:[proofRow]}],proofSnapshots,market)');
+ assert.equal(proof.run('proofRecord.fillEvidence.remaining'),'400','verified raw quantity is used rather than changing YT estimate');
+ for(const side of ['buy','sell']){
+   const p=fixture();p.ctx.apyState.markets=[market];p.ctx.side=side;p.ctx.amount='500';p.ctx.slot=10;p.ctx.bad=false;
+   p.run('walletMonitor.wallets.add(owner);limitState.enabled=true;limitState.options.buyPosition=true;limitState.options.sellPosition=true');
+   const install=target=>{
+     target.ctx.scan=async m=>{
+       const a={...api,order_type:side==='sell'?'sellYT':'buyYT',amount_remaining:target.ctx.amount,tx_signature:target.ctx.replacement?'replacement':api.tx_signature};
+       target.ctx.currentApi=a;
+       const r=target.run("orderWatchRecord(currentApi,market,'eusx',side)");r.fillEvidence={remaining:target.ctx.amount,slot:target.ctx.slot};
+       return {market:m,records:[r],groups:side==='buy'?[{apy:6.7,rows:[{order:a}]}]:[],sellGroups:side==='sell'?[{apy:6.7,rows:[{order:a}]}]:[],checkedAt:Date.now(),error:target.ctx.bad?'stale':''};
+     };target.run('scanWalletMarket=scan');
+   };
+   install(p);await p.run('pollOrderWatches()');assert.equal(p.notices(),0,side+' first snapshot establishes baseline');
+   p.ctx.amount='400';p.ctx.slot++;await p.run('pollOrderWatches()');assert.equal(p.notices(),1,side+' partial fill alerts even at 1/1');
+   assert.match(p.run('[...limitAlarm.entries.values()][0]'),/Partially filled.*20.00%/);
+   p.run('stopLimitAlarm()');await p.run('pollOrderWatches()');assert.equal(p.notices(),1,'Stop and unchanged amount do not replay fill');
+   p.ctx.amount='300';p.ctx.slot++;p.ctx.bad=true;await p.run('pollOrderWatches()');assert.equal(p.notices(),1,'stale amount cannot alert');
+   p.ctx.bad=false;await p.run('pollOrderWatches()');assert.equal(p.notices(),2,'recovery detects further partial fill');
+   p.run('stopLimitAlarm()');const restoredFill=fixture(Object.fromEntries(p.saved));restoredFill.ctx.apyState.markets=[market];restoredFill.ctx.side=side;restoredFill.ctx.amount='300';restoredFill.ctx.slot=p.ctx.slot;install(restoredFill);restoredFill.load();await restoredFill.run('pollOrderWatches(true)');
+   assert.equal(restoredFill.notices(),0,'reload retains observed fill baseline');
+   p.ctx.amount='350';p.ctx.slot++;await p.run('pollOrderWatches()');p.ctx.amount='300';p.ctx.slot++;await p.run('pollOrderWatches()');assert.equal(p.notices(),2,'increased amount cannot raise baseline and cause a false fill');
+   p.ctx.replacement=true;p.ctx.amount='200';p.ctx.slot++;await p.run('pollOrderWatches()');assert.equal(p.notices(),2,'reused order ID with new placement gets a new baseline');
+   p.run(`limitState.options.${side}Position=false`);p.ctx.amount='100';p.ctx.slot++;await p.run('pollOrderWatches()');assert.equal(p.notices(),2,'side toggle OFF suppresses partial fill');
+ }
+ console.log('PASS: wallet lifecycle, position alerts, Buy/Sell partial fills, 1/1, Stop/reload, stale recovery, replacement identity, removals and races');
 })().catch(e=>{console.error(e);process.exitCode=1;});

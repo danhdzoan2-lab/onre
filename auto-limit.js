@@ -16,7 +16,13 @@ function removeAutoWalletAlarms(owner){
 }
 function removeLimitOptionAlarms(name){
   for(const [key,meta] of autoLimitAlarms)if(meta.kind===name){limitAlarm.entries.delete(key);autoLimitAlarms.delete(key);}
-  if(name==='buyPosition'||name==='sellPosition')for(const [key,r] of orderWatchState.records)if((r.orderSide==='sell'?'sellPosition':'buyPosition')===name)limitAlarm.entries.delete(orderWatchAlarmKey(key));
+  if(name==='buyPosition'||name==='sellPosition')for(const key of limitAlarm.entries.keys()){
+    if(!key.startsWith('order-watch:'))continue;
+    try{
+      const identity=JSON.parse(key.slice('order-watch:'.length));
+      if(Array.isArray(identity)&&(identity[0]==='sell'?'sellPosition':'buyPosition')===name)limitAlarm.entries.delete(key);
+    }catch{ /* Ignore unrelated or malformed alarm identities. */ }
+  }
   for(const r of orderWatchState.records.values()){
     if(!r.limitEdges)continue;
     if(name==='buyGap')delete r.limitEdges.gap;

@@ -137,7 +137,11 @@ pollOrderWatches=async function(force=false){
   if(force)walletMonitor.pending=true;
   if(orderWatchState.busy||!walletMonitor.wallets.size||(!limitState.enabled&&!walletMonitor.pending))return;
   if(!apyState.markets||apyState.error||Date.now()-apyState.checkedAt>(typeof apyMaxAge==='function'?apyMaxAge():12000)){
-    walletMonitor.scanError='Market data unavailable.';renderOrderWatches();return;
+    if(typeof ensureFreshApy!=='function'||!await ensureFreshApy()){
+      walletMonitor.scanError='Market data unavailable.';renderOrderWatches();return;
+    }
+    // Another scan or wallet change may have occurred while awaiting APY.
+    if(orderWatchState.busy||!walletMonitor.wallets.size||(!limitState.enabled&&!walletMonitor.pending))return;
   }
   orderWatchState.busy=true;walletMonitor.loading=true;walletMonitor.pending=false;
   renderOrderWatches();

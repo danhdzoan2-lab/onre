@@ -64,10 +64,16 @@ function renderApy() {
   if (typeof renderRewardSimulations === 'function') renderRewardSimulations();
 }
 
-async function fetchApy() {
+function fetchApy() {
   if (apyState.inFlight || Date.now() < apyState.retryAt) return;
   apyState.inFlight = true;
+  apyState.flight = performApyFetch();
+  return apyState.flight;
+}
+async function performApyFetch() {
   const controller = new AbortController();
+  apyState.controller = controller;
+  apyState.startedAt = Date.now();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const response = await fetch(APY_ENDPOINT, { signal: controller.signal });
@@ -88,8 +94,18 @@ async function fetchApy() {
   } finally {
     clearTimeout(timeout);
     apyState.inFlight = false;
+    apyState.flight = null;
+    apyState.controller = null;
     renderApy();
   }
+}
+async function ensureFreshApy(force=false) {
+  // Timers can be delayed while hidden. Release an overdue request on return.
+  if(apyState.inFlight&&Date.now()-apyState.startedAt>=8000)apyState.controller?.abort();
+  const flight=apyState.flight;
+  if(flight)await flight;
+  if((force&&!flight)||!apyState.checkedAt||apyState.error||Date.now()-apyState.checkedAt>apyMaxAge())await fetchApy();
+  return !!apyState.checkedAt&&!apyState.error&&Date.now()-apyState.checkedAt<=apyMaxAge();
 }
 
 let apyRefreshSeconds=2,apyRefreshTimer=null;

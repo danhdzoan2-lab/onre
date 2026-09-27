@@ -22,6 +22,10 @@ function fixture(storage){
 }
 (async()=>{
  const f=fixture();f.run('walletMonitor.wallets.add(owner)');await f.run('pollOrderWatches()');assert.equal(f.scans(),0,'alarm OFF does not auto poll');
+ const recovery=fixture();recovery.run('walletMonitor.wallets.add(owner);limitState.enabled=true;apyState.checkedAt=1');
+ recovery.ctx.ensureFreshApy=async()=>{recovery.ctx.apyState.checkedAt=Date.now();return true;};
+ await Promise.all([recovery.run('pollOrderWatches()'),recovery.run('pollOrderWatches()')]);
+ assert.equal(recovery.scans(),2,'stale APY is refreshed before one shared wallet scan across both maturities');
  await f.run('pollOrderWatches(true)');assert.equal(f.scans(),2,'manual scan covers all maturities');assert.equal(f.run('orderWatchState.records.size'),1);assert.equal(f.sounds(),0);
  assert.equal(f.nodes.get('orderWatchList').children[0].cellsList[0].tokenDot.dataset.fresh,'true','personal order shows its own market health');
  const health=fixture();health.run('walletMonitor.wallets.add(owner)');await health.run('pollOrderWatches(true)');

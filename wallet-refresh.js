@@ -29,3 +29,28 @@ function initWalletOrderRefresh(){
   input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();save();}});
 }
 if(typeof module!=='undefined')module.exports={parseWalletOrderRefreshSeconds};
+
+let walletReturnFlight=null,walletLastReturnAt=0;
+function refreshWalletDashboardOnReturn(event){
+  if(document.visibilityState==='hidden'||(event?.type==='pageshow'&&!event.persisted))return;
+  if(walletReturnFlight)return walletReturnFlight;
+  if(Date.now()-walletLastReturnAt<1500)return;
+  walletLastReturnAt=Date.now();
+  walletReturnFlight=(async()=>{
+    if(!await ensureFreshApy(true)||document.visibilityState==='hidden')return;
+    // Preserve the user's OFF setting; an enabled monitor scans even with collapsed tokens.
+    if(limitState.enabled)await pollOrderWatches(true);
+    if(typeof renderOrderWatches==='function')renderOrderWatches();
+    window.marketLayout?.renderAll();
+  })().catch(()=>{
+    // Individual loaders retain old data and report their own error state.
+    if(typeof renderOrderWatches==='function')renderOrderWatches();
+  }).finally(()=>{walletReturnFlight=null;});
+  return walletReturnFlight;
+}
+if(typeof window!=='undefined'){
+  document.addEventListener?.('visibilitychange',refreshWalletDashboardOnReturn);
+  window.addEventListener('focus',refreshWalletDashboardOnReturn);
+  window.addEventListener('pageshow',refreshWalletDashboardOnReturn);
+  window.addEventListener('online',refreshWalletDashboardOnReturn);
+}

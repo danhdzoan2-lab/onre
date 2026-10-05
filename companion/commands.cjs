@@ -41,7 +41,7 @@ function apyReport(runtime,markets,checkedAt,stale,token,now=Date.now()){
   }
   lines.push('Farthest active maturity · Vietnam time');return lines.join('\n');
 }
-function orderReport(runtime,bundles,command,config,paused,now=Date.now()){
+function orderReport(runtime,bundles,command,config,paused,now=Date.now(),rewards=null){
   const side=command.name==='buy'?'buy':command.name==='sell'?'sell':null;
   const lines=[`📋 OnRe · Personal ${side?side==='buy'?'Buy':'Sell':'Buy / Sell'} Orders`,...(paused?['⏸️ Monitor paused · manual read only']:[]),''];
   if(!config.wallets.length)return lines.concat('👛 No synced wallets. Add wallets on the dashboard and use Sync Telegram.').join('\n');
@@ -60,10 +60,10 @@ function orderReport(runtime,bundles,command,config,paused,now=Date.now()){
         position=verified?result.position:null;status=verified?'Verified':'Queue unverified';
       }
       const apy=100*Math.expm1(r.rawPrice/1e6),amount=typeof r.remainingYt==='number'&&Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
-      lines.push(`${r.orderSide==='sell'?'🔴 Sell':'🟢 Buy'} · ${runtime.assets[r.assetKey].label}`,
+      lines.push(`${r.orderSide==='sell'?'🔴 Sell':'🟢 Buy'} · ${runtime.assets[r.assetKey].label} · APY ${Number.isFinite(apy)?apy.toFixed(2)+'%':'—'}`,
         `📅 Maturity: ${runtime.apyDate(r.maturity*1000)}`,
         `👛 Wallet: ${shortWallet(r.owner)}`,
-        `📈 Order #${r.offerId} · APY ${Number.isFinite(apy)?apy.toFixed(2)+'%':'—'}`,
+        `🎁 Rewards APY: ${!stale&&rewards?runtime.orderRewardsText(r,rewards,now):'—'}`,
         `📍 Position: ${position?`${position.index} / ${position.total}`:'—'} · ${status} ${status==='Verified'?'✅':'⚠️'}`,
         `💰 Remaining YT: ${amount}`,
         ...(!stale?[`🕒 Updated: ${runtime.apyDate(data.checkedAt)} (UTC+7)`]:[]),'');

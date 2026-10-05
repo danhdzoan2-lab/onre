@@ -15,7 +15,7 @@ async function fixture(){
     const groups=[{apy:12.4,rows:[competitor]},{apy:12.5,rows:[personal]}];
     return {market,records:[record],groups:side==='buy'?groups:[],sellGroups:side==='sell'?groups:[],checkedAt:Date.now()};
   };
-  s.loadMarkets=async()=>[market];s.marketAt=Date.now();
+  s.loadMarkets=async()=>[market];s.loadRewards=async()=>null;s.marketAt=Date.now();
   return {s,market,data};
 }
 const message=text=>({text,from:{id:42},chat:{id:42,type:'private'}});
@@ -33,6 +33,31 @@ test('compact wallets and semantic icons in every command report, without identi
   assert.ok(apyReport(s.runtime,[market],Date.now(),false).startsWith('📈'));
   assert.ok(statusReport(s.runtime,s.state).startsWith('🖥️'));
   assert.ok(HELP.includes('🟢 /buy')&&HELP.includes('🔴 /sell'));
+});
+test('Buy/Sell heading includes APY, hides order number and shows exact per-order rewards',async()=>{
+  const {s,data}=await fixture(),now=Date.now();
+  for(const side of ['buy','sell']){
+    const d=data(side),record=d.records[0];record.apiOrderId=127369;record.orderType=side==='buy'?'buyYT':'sellYT';
+    const campaign={id:'c',campaignType:'orderbook_quote',vaultAddress:vault,orderbookAddress:book,incentivizedOrderTypes:[record.orderType],startsAt:new Date(now-1000).toISOString(),endsAt:new Date(now+10000).toISOString(),fundingAmountRaw:'100',distributedRaw:'10',currentRewardsApyByOrderId:{127369:30.333,101:99}};
+    const rewards={campaigns:[campaign],checkedAt:now,error:''};
+    const report=(state=rewards,stale=false)=>orderReport(s.runtime,[{data:d,assetKey:'onyc',stale}],{name:side},s.state.config,false,now,state);
+    assert.match(report(),new RegExp(`${side==='buy'?'🟢 Buy':'🔴 Sell'} · ONyc · APY \\d+\\.\\d{2}%`));
+    assert.doesNotMatch(report(),/Order #|99\.00%/);assert.match(report(),/🎁 Rewards APY: 30.33%/);
+    assert.equal(record.offerId,101);assert.equal(record.apiOrderId,127369);
+    assert.match(report({...rewards,campaigns:[{...campaign,currentRewardsApyByOrderId:{127369:0}}]}),/Rewards APY: 0.00%/);
+    for(const state of [{...rewards,error:'offline'},{...rewards,checkedAt:now-10001},{...rewards,campaigns:[{...campaign,endsAt:new Date(now).toISOString()}]},{...rewards,campaigns:[{...campaign,orderbookAddress:'wrong'}]},{...rewards,campaigns:[{...campaign,incentivizedOrderTypes:[side==='buy'?'sellYT':'buyYT']}]},{...rewards,campaigns:[]}])assert.match(report(state),/Rewards APY: —/);
+    assert.match(report(rewards,true),/Rewards APY: —/);
+  }
+});
+test('reward queries are single-flight, cached and honor Retry-After without changing alarms',async()=>{
+  const {s}=await fixture(),load=MonitorService.prototype.loadRewards.bind(s);
+  const before=JSON.stringify(s.state);let release,requests=0;
+  s.request=async()=>{requests++;return new Promise(resolve=>release=()=>resolve({ok:true,json:async()=>({campaigns:[]})}));};
+  const first=load(),second=load();await new Promise(resolve=>setImmediate(resolve));assert.equal(requests,1);release();
+  await Promise.all([first,second]);await load();assert.equal(requests,1);assert.equal(JSON.stringify(s.state),before);
+  s.rewardState.checkedAt=0;s.request=async()=>{requests++;return {status:429,headers:{get:()=> '120'}};};
+  await load();assert.ok(s.rewardState.retryAt>=Date.now()+119000);await load();assert.equal(requests,2);assert.equal(s.rewardState.error,'Rewards unavailable');
+  s.rewardState.retryAt=0;s.request=async()=>({ok:true,json:async()=>({campaigns:'invalid'})});await load();assert.equal(s.rewardState.error,'Rewards unavailable');
 });
 test('command parsing, token filters, bot mention and bounded replies',async()=>{
   const {s}=await fixture();
@@ -87,7 +112,7 @@ test('manual orders while paused/OFF preserve alarms and fill baseline; shared f
 test('failure preserves old report, success empties it, removed wallet never leaks late response',async()=>{
   const {s,market,data}=await fixture();s.runtime.scanWalletMarket=async()=>data('sell');
   await s.commandText({name:'sell'},s.revision);s.snapshots.get(vault).at=0;s.runtime.scanWalletMarket=async()=>{throw Error('offline');};
-  const stale=await s.commandText({name:'sell'},s.revision);assert.match(stale,/STALE/);assert.match(stale,/Order #101/);assert.doesNotMatch(stale,/No open personal orders/);
+  const stale=await s.commandText({name:'sell'},s.revision);assert.match(stale,/STALE/);assert.match(stale,/🔴 Sell · ONyc · APY/);assert.doesNotMatch(stale,/No open personal orders/);
   s.snapshots.get(vault).at=0;s.runtime.scanWalletMarket=async()=>({market,records:[],groups:[],sellGroups:[],checkedAt:Date.now()});
   assert.match(await s.commandText({name:'sell'},s.revision),/No open personal orders found/);
   s.snapshots.get(vault).at=0;let release;const sent=[];

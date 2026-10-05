@@ -13,6 +13,7 @@ class MonitorService{
     // Restored Position state is not fresh until this process has resynchronized.
     for(const r of Object.values(this.state.records))r.positionFresh=false;
     this.token='';this.botName='';this.pairLink='';this.revision=0;this.markets=null;this.marketAt=0;this.marketRetry=0;this.sending=false;
+    this.rewardState={campaigns:null,checkedAt:0,error:'',retryAt:0};
     this.setRuntime();this.ready=this.loadToken();
   }
   setRuntime(){this.runtime=createRuntime(this.state.config.rpc,this.request);this.engine=new AlarmEngine(this.runtime,this.state);this.snapshots=new Map();}
@@ -94,6 +95,25 @@ class MonitorService{
       this.markets=result;this.marketAt=Date.now();return result;
     }finally{clearTimeout(timer);}
   }
+  async loadRewards(){
+    if(this.rewardFlight)return this.rewardFlight;
+    const state=this.rewardState;
+    if(Date.now()<state.retryAt||!state.error&&state.checkedAt&&Date.now()-state.checkedAt<5000)return state;
+    this.rewardFlight=(async()=>{
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+      try{
+        const response=await this.runtime.withBookRequest(()=>this.request('https://app.exponent.finance/api/orderbook-emissions/campaigns',{signal:controller.signal}));
+        if(response.status===429){state.retryAt=Date.now()+Math.max(1000,this.runtime.apyRetryDelay(response.headers.get('Retry-After')));throw Error('Rewards rate limited');}
+        if(!response.ok)throw Error('Rewards unavailable');
+        const data=await response.json();
+        if(!Array.isArray(data.campaigns)||data.campaigns.some(c=>!c||typeof c!=='object'||Array.isArray(c)))throw Error('Invalid rewards');
+        state.campaigns=data.campaigns;state.checkedAt=Date.now();state.error='';state.retryAt=0;
+      }catch{state.error='Rewards unavailable';state.retryAt=Math.max(state.retryAt,Date.now()+5000);}
+      finally{clearTimeout(timer);}
+      return state;
+    })();
+    try{return await this.rewardFlight;}finally{this.rewardFlight=null;}
+  }
   async scanMarket(market,assetKey,config=this.state.config,runtime=this.runtime){
     const cache=this.snapshots,key=market.vaultAddress;
     const entry=cache.get(key)||{};
@@ -133,6 +153,9 @@ class MonitorService{
     let selected=markets?runtime.walletMarkets(markets):Object.entries(this.state.health).map(([vault,h])=>({assetKey:h.assetKey,market:{vaultAddress:vault,maturityDateUnixTs:h.maturity}}));
     selected=selected.filter(({assetKey})=>!command.token||command.token===assetKey);
     if(stale&&!selected.length)return 'Order data unavailable. Market discovery failed; please try again later.';
+    // Reward estimates are queried only for commands, independently of alert data.
+    // Failure never stops positions/fill monitoring or invalidates order snapshots.
+    const rewardsFlight=selected.length?this.loadRewards():Promise.resolve(null);
     const bundles=[];
     for(let i=0;i<selected.length;i+=3){
       const batch=selected.slice(i,i+3);
@@ -145,7 +168,9 @@ class MonitorService{
         bundles.push({data,stale:failed,assetKey});
       });
     }
-    return orderReport(runtime,bundles,command,config,this.state.paused);
+    const rewards=await rewardsFlight;
+    if(revision!==this.revision)return null;
+    return orderReport(runtime,bundles,command,config,this.state.paused,Date.now(),rewards);
   }
   async replyCommand(text,chat,revision){
     if(!text)return;

@@ -148,11 +148,11 @@ class MonitorService{
     let markets,stale=false;
     try{markets=await this.loadMarkets();}catch{markets=this.markets;stale=true;}
     if(revision!==this.revision)return null;
-    if(command.name==='apy')return markets?apyReport(runtime,markets,this.marketAt,stale,command.token):'Market Implied APY unavailable. Please try again later.';
+    if(command.name==='apy')return markets?apyReport(runtime,markets,this.marketAt,stale,command.token):'⚠️ Market APY unavailable. Try again later.';
     // Do not mistake failed discovery for successful discovery of zero orders.
     let selected=markets?runtime.walletMarkets(markets):Object.entries(this.state.health).map(([vault,h])=>({assetKey:h.assetKey,market:{vaultAddress:vault,maturityDateUnixTs:h.maturity}}));
     selected=selected.filter(({assetKey})=>!command.token||command.token===assetKey);
-    if(stale&&!selected.length)return 'Order data unavailable. Market discovery failed; please try again later.';
+    if(stale&&!selected.length)return '⚠️ Order data unavailable. Try again later.';
     // Reward estimates are queried only for commands, independently of alert data.
     // Failure never stops positions/fill monitoring or invalidates order snapshots.
     const rewardsFlight=selected.length?this.loadRewards():Promise.resolve(null);
@@ -184,10 +184,10 @@ class MonitorService{
     const command=parseCommand(message.text,this.botName,this.runtime.assets);if(!command)return;
     const revision=this.revision,chat=this.state.chatId;
     const dataCommand=!command.error&&['buy','sell','orders','apy'].includes(command.name);
-    if(dataCommand&&this.commandBusy)return this.replyCommand('A data query is already running. Please wait a moment.',chat,revision);
+    if(dataCommand&&this.commandBusy)return this.replyCommand('⏳ Query in progress. Please wait.',chat,revision);
     if(dataCommand)this.commandBusy=true;
     try{await this.replyCommand(await this.commandText(command,revision),chat,revision);}
-    catch{await this.replyCommand('Unable to complete this query. Please try again later.',chat,revision).catch(()=>{});}
+    catch{await this.replyCommand('⚠️ Query failed. Please try again.',chat,revision).catch(()=>{});}
     finally{if(dataCommand)this.commandBusy=false;}
   }
   async tick(){

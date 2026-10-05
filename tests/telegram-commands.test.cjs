@@ -31,14 +31,19 @@ test('compact wallets and semantic icons in every command report, without identi
     for(const name of ['orders',side])for(const stale of [false,true]){
       const compact=orderReport(s.runtime,[{data:d,assetKey:'onyc',stale}],{name},s.state.config,false);
       assert.doesNotMatch(compact,/Remaining YT|Updated:|Maturity:|Order #/);
+      assert.doesNotMatch(compact,/OnRe|Positions use/i);
+      assert.equal(compact.split('\n')[0],`📋 Personal ${name==='orders'?'Buy / Sell':side==='buy'?'Buy':'Sell'} Orders`);
+      assert.ok(!compact.endsWith('\n'));
       assert.ok(!compact.includes(s.runtime.apyDate(d.market.maturityDateUnixTs*1000)));
       assert.ok(!compact.includes(s.runtime.apyDate(d.checkedAt)));
       if(stale)assert.match(compact,/⚠️ STALE/,'freshness warnings remain visible without dates');
     }
     assert.equal(JSON.stringify(d.records),before,'display shortening does not modify full order identity');
   }
-  assert.ok(apyReport(s.runtime,[market],Date.now(),false).startsWith('📈'));
-  assert.ok(statusReport(s.runtime,s.state).startsWith('🖥️'));
+  assert.equal(apyReport(s.runtime,[market],Date.now(),false).split('\n')[0],'📈 Market Implied APY');
+  assert.equal(statusReport(s.runtime,s.state).split('\n')[0],'🖥️ Monitor Status');
+  assert.doesNotMatch(HELP,/OnRe/i);assert.ok(HELP.length<600);
+  assert.doesNotMatch(statusReport(s.runtime,s.state),/Uses the last synced Windows configuration/);
   assert.ok(HELP.includes('🟢 /buy')&&HELP.includes('🔴 /sell'));
 });
 test('Buy/Sell heading includes APY, hides order number and shows exact per-order rewards',async()=>{

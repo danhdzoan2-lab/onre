@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {MonitorService}=require('../companion/service.cjs');
-const {COMMANDS,parseCommand,chunks,apyReport,orderReport}=require('../companion/commands.cjs');
+const {COMMANDS,HELP,shortWallet,parseCommand,chunks,apyReport,orderReport,statusReport}=require('../companion/commands.cjs');
 const owner='Eo17ugMU4EtFUqi2189j6XLLrVcoWYKtQpJE29Yh1k3W',other='3srhDoV9VunGoVGEVNy8NMhkoqeQE8szhN1T2Z6qPgof';
 const vault='7f1PgxY3kGsPqLAKpwcduZkcBEhpjMz7U1iJ4pcCCzDy',book='imv1h6xgX8GyiJjkBj5xvFxwWoB7sCyTGCi6yGK2bZt';
 async function fixture(){
@@ -19,6 +19,21 @@ async function fixture(){
   return {s,market,data};
 }
 const message=text=>({text,from:{id:42},chat:{id:42,type:'private'}});
+test('compact wallets and semantic icons in every command report, without identity changes',async()=>{
+  const {s,market,data}=await fixture();
+  assert.equal(shortWallet(owner),'Eo17ug…1k3W');assert.equal(shortWallet('short'),'short');assert.equal(shortWallet(null),'—');
+  for(const side of ['buy','sell']){
+    const d=data(side),before=JSON.stringify(d.records);
+    const report=orderReport(s.runtime,[{data:d,assetKey:'onyc'}],{name:side},s.state.config,false);
+    assert.ok(report.includes(side==='buy'?'🟢 Buy':'🔴 Sell'));
+    assert.match(report,/👛 Wallet: Eo17ug…1k3W/);assert.ok(!report.includes(owner));
+    assert.match(report,/📍 Position: 2 \/ 2 · Verified ✅/);
+    assert.equal(JSON.stringify(d.records),before,'display shortening does not modify full order identity');
+  }
+  assert.ok(apyReport(s.runtime,[market],Date.now(),false).startsWith('📈'));
+  assert.ok(statusReport(s.runtime,s.state).startsWith('🖥️'));
+  assert.ok(HELP.includes('🟢 /buy')&&HELP.includes('🔴 /sell'));
+});
 test('command parsing, token filters, bot mention and bounded replies',async()=>{
   const {s}=await fixture();
   assert.deepEqual(parseCommand('/SeLL@fixturebot srONyc','FixtureBot',s.runtime.assets),{name:'sell',token:'sronyc'});

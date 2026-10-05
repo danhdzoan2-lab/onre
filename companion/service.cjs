@@ -151,7 +151,7 @@ class MonitorService{
     if(!text)return;
     for(const part of chunks(text)){
       if(revision!==this.revision||chat!==this.state.chatId||!this.token)return;
-      await this.telegram('sendMessage',{chat_id:chat,text:part,reply_markup:{inline_keyboard:[[{text:'Open dashboard',url:'https://onre.vercel.app'}]]}});
+      await this.telegram('sendMessage',{chat_id:chat,text:part,reply_markup:{inline_keyboard:[[{text:'🌐 Open dashboard',url:'https://onre.vercel.app'}]]}});
     }
   }
   async handleCommand(message){

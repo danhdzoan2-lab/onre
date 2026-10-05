@@ -22,6 +22,20 @@ The default scan target is five seconds, configurable from 2–3,600 seconds loc
 - Persistent state, pending deliveries and DPAPI-encrypted credentials live under `%LOCALAPPDATA%\OnReTelegram`, outside Git/Vercel. No runtime token is served to the dashboard.
 - Telegram delivery uses retries with backoff. Telegram has no send-message idempotency key, so an ambiguous network failure can produce a duplicate; exactly-once delivery is not promised. No alerts can guarantee enough time to cancel before a fast fill.
 
+## Telegram commands
+
+The linked private chat gets a command menu automatically. Commands are read-only; another chat or sender cannot retrieve your wallets/orders.
+
+- `/orders`: personal Buy and Sell positions on every unexpired maturity.
+- `/buy` / `/sell`: personal orders on one side, including APY, remaining YT, maturity and full wallet address.
+- `/apy`: Market Implied APY for ONyc, srONyc, eUSX, USX and srEHYUSD, using the same farthest-active-maturity selection as the dashboard.
+- `/status`: the last synced wallet count, Position toggles, scan interval, sync time and per-market health.
+- `/help` (or `/start` after linking): command examples.
+
+Order/APY commands accept an optional token, case-insensitively: `/sell ONyc`, `/orders srONyc`, `/apy srEHYUSD`. `/apy STRCx` is available explicitly for legacy users, but does not add it to the default list or dashboard filters. Times are Vietnam time (UTC+7).
+
+Queries share in-flight requests and recent snapshots with the alert scanner. While paused or with Position alerts OFF, they perform a manual data read without resuming monitoring, changing acknowledgments or updating fill baselines. A failed refresh retains and labels the last data **STALE**; unverifiable FIFO positions show **Queue unverified**, never a falsely verified position. A successful empty snapshot is not reported as a fill/cancellation. Replies can span several messages for many orders. Windows must remain awake/online to answer commands; restart the companion after code updates, without re-linking the bot.
+
 ## Stop / uninstall
 
 Use **Pause** or **Disconnect** on the local page. Disconnect removes stored bot credentials and stops Telegram; dashboard alarms are unchanged. Run `companion\uninstall.ps1` to remove the logon task. It retains runtime state for recovery. If a process was started manually, stop that process separately. Do not move the checkout while the scheduled task still points to it; reinstall after moving.

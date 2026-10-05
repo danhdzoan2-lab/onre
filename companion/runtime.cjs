@@ -5,12 +5,11 @@ const root=path.resolve(__dirname,'..');
 // No eval of API data, browser storage, HTML, or downloaded code is involved.
 function createRuntime(rpc,request=fetch){
   const context=vm.createContext({Date,Map,Set,BigInt,Number,Promise,Uint8Array,AbortController,setTimeout,clearTimeout,
-    atob,fetch:request,getProxy:()=>rpc,ExponentBook:require('../orderbook.js'),
-    apyRetryDelay:header=>{const n=Number(header);return header&&Number.isFinite(n)?Math.max(1000,n*1000):Math.max(1000,Date.parse(header)-Date.now()||30000);}});
-  for(const file of ['assets.js','position-groups.js','buy-orderbook.js','sell-orderbook.js','order-watch.js','order-rpc.js','order-placement.js','wallet-core.js']){
+    atob,fetch:request,getProxy:()=>rpc,ExponentBook:require('../orderbook.js')});
+  for(const file of ['assets.js','apy.js','position-groups.js','buy-orderbook.js','sell-orderbook.js','order-watch.js','order-rpc.js','order-placement.js','wallet-core.js']){
     vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
   }
-  return vm.runInContext('({assets:ASSETS,validMonitorWallet,walletMarkets,scanWalletMarket,orderWatchKey,watchedGroupResult,walletPartialFill,validWalletFillState,withBookRequest})',context);
+  return vm.runInContext('({assets:ASSETS,farthestApyMarket,formatImpliedApy,apyDate,validMonitorWallet,walletMarkets,scanWalletMarket,orderWatchKey,watchedGroupResult,walletPartialFill,validWalletFillState,withBookRequest})',context);
 }
 function validateConfig(value,previous={interval:5}){
   if(!value||value.version!==1||!Array.isArray(value.wallets)||value.wallets.length>100)throw Error('Invalid configuration');

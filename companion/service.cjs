@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {createRuntime,validateConfig}=require('./runtime.cjs'),{AlarmEngine}=require('./engine.cjs'),{protect}=require('./vault.cjs');
+const {COMMANDS,HELP,parseCommand,chunks,apyReport,orderReport,statusReport}=require('./commands.cjs');
 const DEFAULT_RPC='https://wild-night-f072.amazygo1.workers.dev';
 class MonitorService{
   constructor(directory,request=fetch){
@@ -14,9 +15,22 @@ class MonitorService{
     this.token='';this.botName='';this.pairLink='';this.revision=0;this.markets=null;this.marketAt=0;this.marketRetry=0;this.sending=false;
     this.setRuntime();this.ready=this.loadToken();
   }
-  setRuntime(){this.runtime=createRuntime(this.state.config.rpc,this.request);this.engine=new AlarmEngine(this.runtime,this.state);}
+  setRuntime(){this.runtime=createRuntime(this.state.config.rpc,this.request);this.engine=new AlarmEngine(this.runtime,this.state);this.snapshots=new Map();}
   async loadToken(){
     if(this.state.encryptedToken){try{this.token=await protect(this.state.encryptedToken,true);const me=await this.telegram('getMe',{});this.botName=me.username;}catch{this.statusError='Bot unavailable; check credentials or connection.';}}
+    await this.ensureCommands();
+  }
+  async ensureCommands(){
+    const chat=this.state.chatId,token=this.token;
+    if(!chat||!token||this.menuBusy||this.menuOwner===chat||Date.now()<(this.menuRetry||0))return;
+    this.menuBusy=true;
+    try{
+      await this.telegram('setMyCommands',{commands:COMMANDS,scope:{type:'chat',chat_id:chat}},10000,token);
+      if(chat!==this.state.chatId||token!==this.token)return;
+      await this.telegram('setChatMenuButton',{chat_id:chat,menu_button:{type:'commands'}},10000,token);
+      if(chat===this.state.chatId&&token===this.token)this.menuOwner=chat;
+    }catch(e){this.menuRetry=Date.now()+Math.max(60000,(e.retryAfter||0)*1000);}
+    finally{this.menuBusy=false;}
   }
   save(){
     // Same-volume atomic replace: a crash never leaves a partly written JSON state.
@@ -39,7 +53,7 @@ class MonitorService{
     if(webhook.url)throw Error('This bot has a webhook. Use a new dedicated bot.');
     const encrypted=await protect(token);
     this.revision++;this.token=token;this.botName=me.username;this.state.encryptedToken=encrypted;this.state.chatId=null;this.state.updateOffset=0;this.state.deliveries={};this.state.outbox=[];this.state.paused=true;
-    this.createPair();this.save();
+    this.menuOwner=null;this.menuRetry=0;this.createPair();this.save();
   }
   createPair(){
     if(!this.token||!this.botName)throw Error('Connect a bot first.');
@@ -57,13 +71,18 @@ class MonitorService{
   }
   pause(value){this.state.paused=value;this.revision++;this.save();}
   disconnect(){
-    this.revision++;this.state.paused=true;this.state.chatId=null;this.state.encryptedToken=null;this.state.pairHash=null;this.state.pairExpires=0;this.state.outbox=[];this.state.deliveries={};this.token='';this.pairLink='';this.save();
+    this.revision++;this.state.paused=true;this.state.chatId=null;this.state.encryptedToken=null;this.state.pairHash=null;this.state.pairExpires=0;this.state.outbox=[];this.state.deliveries={};this.token='';this.pairLink='';this.menuOwner=null;this.snapshots.clear();this.save();
   }
   view(){
     return {connected:!!this.state.chatId,botConfigured:!!this.token,botName:this.botName,paused:this.state.paused,config:this.state.config,syncedAt:this.state.syncedAt||0,checkedAt:this.state.checkedAt||0,
       pairLink:this.state.pairExpires>Date.now()?this.pairLink:'',status:this.statusError||'',health:Object.values(this.state.health).map(h=>({...h,label:this.runtime.assets[h.assetKey]?.label||'Markets'})),pending:this.state.outbox.length};
   }
   async loadMarkets(){
+    if(this.marketFlight)return this.marketFlight;
+    this.marketFlight=this.fetchMarkets();
+    try{return await this.marketFlight;}finally{this.marketFlight=null;}
+  }
+  async fetchMarkets(){
     if(Date.now()<this.marketRetry)throw Error('Markets rate limited');
     if(this.markets&&Date.now()-this.marketAt<30000)return this.markets;
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
@@ -74,6 +93,77 @@ class MonitorService{
       const result=await response.json();if(!Array.isArray(result)||result.some(x=>!x||typeof x!=='object'||Array.isArray(x)))throw Error('Invalid markets');
       this.markets=result;this.marketAt=Date.now();return result;
     }finally{clearTimeout(timer);}
+  }
+  async scanMarket(market,assetKey,config=this.state.config,runtime=this.runtime){
+    const cache=this.snapshots,key=market.vaultAddress;
+    const entry=cache.get(key)||{};
+    if(entry.flight)return entry.flight;
+    if(entry.data&&Date.now()-entry.at<2000)return entry.data;
+    cache.set(key,entry);
+    entry.flight=(async()=>{
+      let data;
+      try{data=await runtime.scanWalletMarket(market,assetKey,new Set(config.wallets));}
+      catch{data={market,error:'Data unavailable'};}
+      entry.data=data;entry.at=Date.now();
+      if(!data.error&&data.checkedAt&&Date.now()-data.checkedAt<=12000){
+        // Read-only report cache: never modifies alarm ACK or partial-fill baselines.
+        entry.lastGood={...data,records:data.records.map(r=>{
+          const groups=r.orderSide==='sell'?data.sellGroups:data.groups;
+          const result=runtime.watchedGroupResult(r,{...data,groups,personalRecords:data.records});
+          const prefix=groups?.flatMap(g=>g.rows).slice(0,result.position?.total||0);
+          const verified=prefix?.length&&prefix.every(row=>row.position)&&result.front!==null;
+          return {...r,groupPosition:verified?result.position:null};
+        })};
+      }
+      return data;
+    })();
+    try{return await entry.flight;}finally{entry.flight=null;}
+  }
+  async commandText(command,revision){
+    const runtime=this.runtime,config=this.state.config;
+    if(command.error)return command.error;
+    if(command.name==='help')return HELP;
+    if(command.name==='status')return statusReport(runtime,this.state);
+    if(command.name!=='apy'&&!config.wallets.length)return orderReport(runtime,[],command,config,this.state.paused);
+    let markets,stale=false;
+    try{markets=await this.loadMarkets();}catch{markets=this.markets;stale=true;}
+    if(revision!==this.revision)return null;
+    if(command.name==='apy')return markets?apyReport(runtime,markets,this.marketAt,stale,command.token):'Market Implied APY unavailable. Please try again later.';
+    // Do not mistake failed discovery for successful discovery of zero orders.
+    let selected=markets?runtime.walletMarkets(markets):Object.entries(this.state.health).map(([vault,h])=>({assetKey:h.assetKey,market:{vaultAddress:vault,maturityDateUnixTs:h.maturity}}));
+    selected=selected.filter(({assetKey})=>!command.token||command.token===assetKey);
+    if(stale&&!selected.length)return 'Order data unavailable. Market discovery failed; please try again later.';
+    const bundles=[];
+    for(let i=0;i<selected.length;i+=3){
+      const batch=selected.slice(i,i+3);
+      const results=stale?batch.map(({market})=>({market,error:true})):await Promise.all(batch.map(({market,assetKey})=>this.scanMarket(market,assetKey,config,runtime)));
+      if(revision!==this.revision)return null;
+      results.forEach((data,j)=>{
+        const {market,assetKey}=batch[j];
+        const failed=!!data.error||!data.checkedAt||Date.now()-data.checkedAt>12000;
+        if(failed)data=this.snapshots.get(market.vaultAddress)?.lastGood||{market,checkedAt:0,records:Object.values(this.state.records).filter(r=>r.active&&r.vault===market.vaultAddress)};
+        bundles.push({data,stale:failed,assetKey});
+      });
+    }
+    return orderReport(runtime,bundles,command,config,this.state.paused);
+  }
+  async replyCommand(text,chat,revision){
+    if(!text)return;
+    for(const part of chunks(text)){
+      if(revision!==this.revision||chat!==this.state.chatId||!this.token)return;
+      await this.telegram('sendMessage',{chat_id:chat,text:part,reply_markup:{inline_keyboard:[[{text:'Open dashboard',url:'https://onre.vercel.app'}]]}});
+    }
+  }
+  async handleCommand(message){
+    if(message?.chat?.type!=='private'||String(message.chat.id)!==this.state.chatId||String(message.from?.id)!==this.state.chatId)return;
+    const command=parseCommand(message.text,this.botName,this.runtime.assets);if(!command)return;
+    const revision=this.revision,chat=this.state.chatId;
+    const dataCommand=!command.error&&['buy','sell','orders','apy'].includes(command.name);
+    if(dataCommand&&this.commandBusy)return this.replyCommand('A data query is already running. Please wait a moment.',chat,revision);
+    if(dataCommand)this.commandBusy=true;
+    try{await this.replyCommand(await this.commandText(command,revision),chat,revision);}
+    catch{await this.replyCommand('Unable to complete this query. Please try again later.',chat,revision).catch(()=>{});}
+    finally{if(dataCommand)this.commandBusy=false;}
   }
   async tick(){
     if(this.scanning||this.sending||this.state.paused||!this.state.chatId||!this.token||!this.state.config.wallets.length||!(this.state.config.buyPosition||this.state.config.sellPosition))return;
@@ -86,7 +176,7 @@ class MonitorService{
       this.state.discoveryWarned=false;this.state.discoveryFailedSince=null;
       this.statusError='';
       for(let i=0;i<markets.length;i+=3){
-        const batch=markets.slice(i,i+3),results=await Promise.allSettled(batch.map(({market,assetKey})=>runtime.scanWalletMarket(market,assetKey,new Set(config.wallets))));
+        const batch=markets.slice(i,i+3),results=await Promise.allSettled(batch.map(({market,assetKey})=>this.scanMarket(market,assetKey,config,runtime)));
         if(revision!==this.revision)return;
         results.forEach((outcome,j)=>{
           const {market,assetKey}=batch[j];const data=outcome.status==='fulfilled'?outcome.value:{market,error:'Data unavailable'};
@@ -153,8 +243,11 @@ class MonitorService{
         const m=update.message,callback=update.callback_query;
         if(m?.chat?.type==='private'&&!this.state.chatId&&/^\/start [\w-]+$/.test(m.text||'')&&this.state.pairExpires>Date.now()){
           const hash=crypto.createHash('sha256').update(m.text.split(' ')[1]).digest('hex');
-          if(hash===this.state.pairHash){this.state.chatId=String(m.chat.id);this.state.pairHash=null;this.state.pairExpires=0;this.pairLink='';this.state.paused=false;this.save();await this.telegram('sendMessage',{chat_id:this.state.chatId,text:'OnRe linked. Position and partial-fill alerts use your last synced Windows settings. Keep the PC awake and online.'});}
+          if(hash===this.state.pairHash){this.state.chatId=String(m.chat.id);this.state.pairHash=null;this.state.pairExpires=0;this.pairLink='';this.state.paused=false;this.save();await this.telegram('sendMessage',{chat_id:this.state.chatId,text:'OnRe linked. Position and partial-fill alerts use your last synced Windows settings. Keep the PC awake and online. Use /help to view commands.'});void this.ensureCommands();continue;}
         }
+        // Commit offset before asynchronous read-only work. Long queries must not
+        // block Acknowledge callbacks or the next Telegram long poll.
+        if(m){this.save();this.commandJob=this.handleCommand(m).catch(()=>{});}
         if(callback&&String(callback.message?.chat?.id)===this.state.chatId&&String(callback.from?.id)===this.state.chatId){
           const id=callback.data?.startsWith('ack:')?callback.data.slice(4):'';
           if(this.state.deliveries[id]){this.engine.acknowledge(this.state.deliveries[id]);this.save();await this.telegram('answerCallbackQuery',{callback_query_id:callback.id,text:'Acknowledged on Telegram. Dashboard audio is unchanged.'});}
@@ -170,6 +263,7 @@ class MonitorService{
     this.timer=setInterval(()=>{
       if(Date.now()>=nextScan&&!this.scanning){nextScan=Date.now()+this.state.config.interval*1000;void this.tick().catch(()=>{this.statusError='Monitoring error; retrying.';});}
       if(Date.now()>=(this.botRetry||0))void this.updates().catch(()=>{});
+      void this.ensureCommands();
       if(!this.scanning)void this.flush().catch(()=>{});
     },1000);
   }

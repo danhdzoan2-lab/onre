@@ -49,7 +49,7 @@ function orderReport(runtime,bundles,command,config,paused,now=Date.now(),reward
   for(const bundle of bundles){
     const {data,assetKey}=bundle,stale=bundle.stale||!data.checkedAt||now-data.checkedAt>12000;
     const records=(data.records||[]).filter(r=>config.wallets.includes(r.owner)&&(!side||r.orderSide===side)&&r.expiry>now/1000&&r.maturity>now/1000);
-    if(stale){unavailable++;lines.push(`🪙 ${runtime.assets[assetKey].label} · ${runtime.apyDate(data.market.maturityDateUnixTs*1000)}\n⚠️ STALE — refresh failed; previous data only${data.checkedAt?' · '+runtime.apyDate(data.checkedAt):''}`);}
+    if(stale){unavailable++;lines.push(`🪙 ${runtime.assets[assetKey].label}\n⚠️ STALE — refresh failed; previous data only`);}
     for(const r of records){
       count++;let position=r.groupPosition,status='STALE';
       if(!stale){
@@ -59,14 +59,11 @@ function orderReport(runtime,bundles,command,config,paused,now=Date.now(),reward
         const verified=now-data.checkedAt<=12000&&prefix?.length&&prefix.every(row=>row.position)&&result.front!==null;
         position=verified?result.position:null;status=verified?'Verified':'Queue unverified';
       }
-      const apy=100*Math.expm1(r.rawPrice/1e6),amount=typeof r.remainingYt==='number'&&Number.isFinite(r.remainingYt)?r.remainingYt.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+      const apy=100*Math.expm1(r.rawPrice/1e6);
       lines.push(`${r.orderSide==='sell'?'🔴 Sell':'🟢 Buy'} · ${runtime.assets[r.assetKey].label} · APY ${Number.isFinite(apy)?apy.toFixed(2)+'%':'—'}`,
-        `📅 Maturity: ${runtime.apyDate(r.maturity*1000)}`,
         `👛 Wallet: ${shortWallet(r.owner)}`,
         `🎁 Rewards APY: ${!stale&&rewards?runtime.orderRewardsText(r,rewards,now):'—'}`,
-        `📍 Position: ${position?`${position.index} / ${position.total}`:'—'} · ${status} ${status==='Verified'?'✅':'⚠️'}`,
-        `💰 Remaining YT: ${amount}`,
-        ...(!stale?[`🕒 Updated: ${runtime.apyDate(data.checkedAt)} (UTC+7)`]:[]),'');
+        `📍 Position: ${position?`${position.index} / ${position.total}`:'—'} · ${status} ${status==='Verified'?'✅':'⚠️'}`,'');
     }
   }
   if(!count)lines.push(unavailable?'⚠️ No verified order list available. Failed markets are not treated as empty.':'📭 No open personal orders found.');

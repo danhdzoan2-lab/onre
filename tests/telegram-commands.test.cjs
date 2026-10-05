@@ -28,6 +28,13 @@ test('compact wallets and semantic icons in every command report, without identi
     assert.ok(report.includes(side==='buy'?'🟢 Buy':'🔴 Sell'));
     assert.match(report,/👛 Wallet: Eo17ug…1k3W/);assert.ok(!report.includes(owner));
     assert.match(report,/📍 Position: 2 \/ 2 · Verified ✅/);
+    for(const name of ['orders',side])for(const stale of [false,true]){
+      const compact=orderReport(s.runtime,[{data:d,assetKey:'onyc',stale}],{name},s.state.config,false);
+      assert.doesNotMatch(compact,/Remaining YT|Updated:|Maturity:|Order #/);
+      assert.ok(!compact.includes(s.runtime.apyDate(d.market.maturityDateUnixTs*1000)));
+      assert.ok(!compact.includes(s.runtime.apyDate(d.checkedAt)));
+      if(stale)assert.match(compact,/⚠️ STALE/,'freshness warnings remain visible without dates');
+    }
     assert.equal(JSON.stringify(d.records),before,'display shortening does not modify full order identity');
   }
   assert.ok(apyReport(s.runtime,[market],Date.now(),false).startsWith('📈'));
@@ -87,7 +94,7 @@ test('menu registration failure backs off without disabling the bot',async()=>{
 for(const side of ['buy','sell'])test(`${side} report shares front-to-personal positions; unverified/stale labels`,async()=>{
   const {s,data}=await fixture(),d=data(side),command={name:side};
   const report=orderReport(s.runtime,[{data:d,assetKey:'onyc'}],command,s.state.config,false);
-  assert.match(report,/Position: 2 \/ 2 · Verified/);assert.match(report,/Remaining YT: 123.46/);
+  assert.match(report,/Position: 2 \/ 2 · Verified/);assert.doesNotMatch(report,/Remaining YT|Updated:|Maturity:/);
   const groups=side==='buy'?d.groups:d.sellGroups;groups[0].rows[0].position=null;
   assert.match(orderReport(s.runtime,[{data:d,assetKey:'onyc'}],command,s.state.config,false),/Position: — · Queue unverified/);
   d.records[0].groupPosition={index:2,total:2};

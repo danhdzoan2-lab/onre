@@ -27,7 +27,7 @@ The default scan target is five seconds, configurable from 2–3,600 seconds loc
 The linked private chat gets a command menu automatically. Commands are read-only; another chat or sender cannot retrieve your wallets/orders.
 
 - `/orders`: personal Buy and Sell positions on every unexpired maturity.
-- `/buy` / `/sell`: personal orders on one side, with Order APY on the Buy/Sell heading, per-order Rewards APY, remaining YT, maturity and a shortened wallet address (first six + last four characters). Order numbers are hidden; stored identities remain complete. Rewards use Exponent's existing campaign API and the dashboard's exact API-order-ID/vault/book/type matching. Missing, stale, expired or failed reward data displays `—`, not a simulated APY. Buy/Sell and data states have distinct icons.
+- `/buy` / `/sell`: personal orders on one side, with Order APY on the Buy/Sell heading, per-order Rewards APY, Position and a shortened wallet address (first six + last four characters). Order numbers, Remaining YT, update time and maturity are hidden in order replies; stored identities and freshness checks remain complete. Rewards use Exponent's existing campaign API and the dashboard's exact API-order-ID/vault/book/type matching. Missing, stale, expired or failed reward data displays `—`, not a simulated APY. Buy/Sell and data states have distinct icons.
 - `/apy`: Market Implied APY for ONyc, srONyc, eUSX, USX and srEHYUSD, using the same farthest-active-maturity selection as the dashboard.
 - `/status`: the last synced wallet count, Position toggles, scan interval, sync time and per-market health.
 - `/help` (or `/start` after linking): command examples.

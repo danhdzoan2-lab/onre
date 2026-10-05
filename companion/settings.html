@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OnRe Telegram · Windows</title><link rel="stylesheet" href="/settings.css"><script src="/settings.js" defer></script></head><body><main>
+<h1>OnRe Telegram</h1><p>Windows background monitor · Keep this PC awake and online. Closing this settings page does not stop monitoring.</p>
+<section><h2>Dashboard sync</h2><p id="syncState">Use Sync Telegram in your dashboard Settings.</p><p id="configState"></p><p id="scanState"></p></section>
+<section><h2>Connect Telegram</h2><p>Create a dedicated bot with <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">BotFather</a> using /newbot. Paste the token here, not in the public dashboard or chat.</p>
+<form id="botForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="new-password" maxlength="130" required><button>Save bot</button></form>
+<p id="botState"></p><a id="pairLink" hidden target="_blank" rel="noopener noreferrer">Open Telegram and press Start</a><button id="newPair" type="button" hidden>New linking code</button></section>
+<section><h2>Monitoring</h2><form id="intervalForm"><label for="interval">Wallet scan (seconds)</label><input id="interval" type="number" min="2" max="3600" step="1" value="5" required><button>Save</button></form>
+<div class="actions"><button id="pause" type="button">Resume</button><button id="test" type="button">Send test</button><button id="disconnect" type="button">Disconnect</button></div><p id="error" role="status" aria-live="polite"></p>
+<p>Position alerts repeat every minute while fresh and still first, until Acknowledge. Further partial fills send new alerts. Acknowledge does not stop dashboard audio.</p>
+<div class="table-wrap"><table><thead><tr><th>Token</th><th>Maturity</th><th>Status</th><th>Last update</th></tr></thead><tbody id="markets"></tbody></table></div></section>
+<p>Read-only alerts; this service cannot cancel orders. Fast fills can occur between scans. An order disappearing is not proof it filled.</p></main></body></html>

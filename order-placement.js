@@ -56,11 +56,11 @@ async function reconcileBuyOrders(orders,market,snapshots) {
   // Indexed timestamps can differ from Solana's clock. Repair only when the
   // finalized Post Offer identifies the current on-chain incarnation exactly.
   for(let i=0;i<output.length;i+=3)await Promise.all(output.slice(i,i+3).map(async o=>{
-    if(o.order_type!=='buyYT'||buyQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
+    if(o.order_type!=='buyYT'||o.is_removed===true||String(o.amount_remaining)==='0'||Date.parse(o.expiry_at)/1000<=Date.now()/1000||buyQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
     const snapshot=snapshots.get(o.orderbook_address),book=snapshot?.book;
     if(!book||snapshot.error||book.vault!==market.vaultAddress||book.maturity!==market.maturityDateUnixTs)return;
     const offer=book.offers.get(o.offer_idx),price=book.prices.find(p=>p.id===offer?.pricePointer)?.price;
-    if(!offer||offer.owner!==o.user_address||offer.side!==2||offer.virtual!==0||price!==o.price_implied_apy)return;
+    if(!offer||offer.owner!==o.user_address||offer.side!==2||offer.virtual!==0||price!==o.price_implied_apy||offer.amount<=0n||offer.expiry<=Date.now()/1000||String(offer.amount)!==String(o.amount_remaining))return;
     const record=orderWatchRecord(o,market,'proof');if(!record||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(record.signature))return;
     try{
       const tx=await placementRead('getTransaction',[record.signature,{encoding:'json',commitment:'finalized',maxSupportedTransactionVersion:0}]);
@@ -75,11 +75,11 @@ async function reconcileBuyOrders(orders,market,snapshots) {
 async function reconcileSellOrders(orders,market,snapshots) {
   const output=orders.map(({_chainCreated,_chainExpiry,...o})=>o);
   for(let i=0;i<output.length;i+=3)await Promise.all(output.slice(i,i+3).map(async o=>{
-    if(o.order_type!=='sellYT'||sellQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
+    if(o.order_type!=='sellYT'||o.is_removed===true||String(o.amount_remaining)==='0'||Date.parse(o.expiry_at)/1000<=Date.now()/1000||sellQueuePosition(o,market,snapshots.get(o.orderbook_address),Date.now()/1000))return;
     const snapshot=snapshots.get(o.orderbook_address),book=snapshot?.book;
     if(!book||snapshot.error||book.vault!==market.vaultAddress||book.maturity!==market.maturityDateUnixTs)return;
     const offer=book.offers.get(o.offer_idx),price=book.prices.find(p=>p.id===offer?.pricePointer)?.price;
-    if(!offer||offer.owner!==o.user_address||offer.side!==1||offer.virtual!==0||price!==o.price_implied_apy)return;
+    if(!offer||offer.owner!==o.user_address||offer.side!==1||offer.virtual!==0||price!==o.price_implied_apy||offer.amount<=0n||offer.expiry<=Date.now()/1000||String(offer.amount)!==String(o.amount_remaining))return;
     const record=orderWatchRecord(o,market,'proof','sell');if(!record||!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(record.signature))return;
     try{
       const tx=await placementRead('getTransaction',[record.signature,{encoding:'json',commitment:'finalized',maxSupportedTransactionVersion:0}]);

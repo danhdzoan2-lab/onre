@@ -247,6 +247,11 @@
     </div></div>
     <div class="notice-row">
       <span id="volumeNote" hidden></span>
+    </div>
+    <div class="refresh-settings telegram-settings">
+      <div class="field"><label>Telegram · Windows background monitor</label><span>Buy/Sell Position and partial fills · Uses your last synced settings. <a href="https://github.com/danhdzoan2-lab/onre/blob/main/docs/telegram-windows.md" target="_blank" rel="noopener noreferrer">Setup guide</a></span></div>
+      <button id="syncTelegram" type="button" class="primary-action">Sync Telegram</button>
+      <p id="telegramSyncStatus" role="status" aria-live="polite"></p>
     </div></details>
     <div class="notice-row"><div id="notifBanner" class="notif-banner" role="status" aria-live="polite">Alerts are ready</div>
     </div>
@@ -328,6 +333,7 @@
   </section>
 </main>
 
+<script src="assets.js"></script>
 <script>
   const CONTRACTS = {
     clmm: { name: 'Exponent CLMM', address: 'XPC1MM4dYACDfykNuXYZ5una2DsMDWL24CrYubCvarC' },
@@ -356,16 +362,6 @@
   }
   let selectedContract = 'clmm';
   let contractRevision = 0;
-  const ONYC_MINT = '5Y8NV33Vv7WbnLfq3zBcKSdYPrk7g2KoiQoe7M2tcxp5';
-  const STRCX_MINT = 'Xs78JED6PFZxWc2wCEPspZW9kL3Se5J7L5TChKgsidH';
-  const ASSETS = {
-    onyc: { label: 'ONyc', mint: ONYC_MINT },
-    strcx: { label: 'STRCx', mint: STRCX_MINT },
-    sronyc: { label: 'srONyc', mint: '9J8VvigcjFTkN3jhZH2ieTi2hdGVBVpEXbcA1JDo7QpA' },
-    eusx: { label: 'eUSX', mint: '3ThdFZQKM6kRyVGLG48kaPg5TRMhYMKY1iCRa9xop1WC' },
-    usx: { label: 'USX', mint: '6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG' },
-    srehyusd: { label: 'srEHYUSD', mint: 'FvQP1fjox2GPSwkEhENuZisz8UeRURLWf7GYF9n2mURD' }
-  };
   const DEFAULT_HIGH_VOLUME_THRESHOLD = 5000;
   const HIGH_VOLUME_STORAGE_KEY = 'exponent-clmm-high-volume-threshold';
   const RPC_TIMEOUT_MS = 8000;
@@ -1062,7 +1058,9 @@
 <script src="order-placement.js"></script>
 <script src="order-watch.js"></script>
 <script src="wallet-refresh.js"></script>
+<script src="wallet-core.js"></script>
 <script src="wallet-monitor.js"></script>
+<script src="telegram-sync.js"></script>
 <script src="auto-limit.js"></script>
 <script src="reward-simulation.js"></script>
 <link rel="stylesheet" href="reward-simulation.css">

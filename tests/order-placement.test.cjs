@@ -5,7 +5,7 @@ const event={book:'b',vault:'v',owner:'o',id:2,price:65000,amount:'123',side:2,v
 let events=[event],calls=[];
 const tx={slot:900,meta:{err:null},transaction:{signatures:[record.signature]}};
 const context=vm.createContext({module:{exports:{}},ExponentBook:{postEvents:()=>events},getProxy:()=> 'proxy',
-  orderRpc:async(method)=>{calls.push(method);return method==='getTransaction'?tx:{signatures:['other',record.signature]};},Date,Map,Promise,Number,Math,Error});
+  orderRpc:async(method)=>{calls.push(method);return method==='getTransaction'?tx:{signatures:['other',record.signature]};},Date:class extends Date{static now(){return 150000;}},Map,Promise,Number,Math,Error});
 vm.runInContext(fs.readFileSync('order-placement.js','utf8'),context);
 const {placementEvent,comparePlacements}=context.module.exports;
 assert.ok(placementEvent(record,tx));
@@ -34,6 +34,11 @@ context.record=record;
   const repaired=await vm.runInContext('reconcileBuyOrders(orders,market,snapshots)',context);
   assert.equal(repaired[0]._chainCreated,100,'confirmed event repairs API timestamp drift');
   assert.equal(context.orders[0]._chainCreated,undefined,'API identity is preserved');
+  const liveRead=context.placementRead;let historicalReads=0;context.placementRead=async()=>{historicalReads++;return tx;};
+  for(const closed of [{is_removed:true},{amount_remaining:'0'},{expiry_at:new Date(1000).toISOString()}]){
+    context.closedOrders=[{...context.orders[0],...closed}];await vm.runInContext('reconcileBuyOrders(closedOrders,market,snapshots)',context);
+  }
+  assert.equal(historicalReads,0,'closed and expired API rows do not trigger historical RPC reads');context.placementRead=liveRead;
   context.snapshot.book.offers.get(2).created=99;
   const reused=await vm.runInContext('reconcileBuyOrders(orders,market,snapshots)',context);
   assert.equal(reused[0]._chainCreated,undefined,'reused ID with another creation time is rejected');

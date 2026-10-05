@@ -1,4 +1,4 @@
 {
-  "buildCommand": "",
-  "outputDirectory": "."
+  "buildCommand": "node scripts/build-static.cjs",
+  "outputDirectory": "dist"
 }

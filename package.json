@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "dev": "npx http-server",
-    "build": "echo 'No build needed for static site'"
+    "build": "node scripts/build-static.cjs"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -165,7 +165,7 @@ class MonitorService{
         const {market,assetKey}=batch[j];
         const failed=!!data.error||!data.checkedAt||Date.now()-data.checkedAt>12000;
         if(failed)data=this.snapshots.get(market.vaultAddress)?.lastGood||{market,checkedAt:0,records:Object.values(this.state.records).filter(r=>r.active&&r.vault===market.vaultAddress)};
-        bundles.push({data,stale:failed,assetKey});
+        bundles.push({data,stale:failed,assetKey,market,marketCheckedAt:this.marketAt,marketStale:stale});
       });
     }
     const rewards=await rewardsFlight;

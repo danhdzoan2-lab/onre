@@ -60,8 +60,13 @@ function orderReport(runtime,bundles,command,config,paused,now=Date.now(),reward
         position=verified?result.position:null;status=verified?'Verified':'Queue unverified';
       }
       const apy=100*Math.expm1(r.rawPrice/1e6);
-      lines.push(`${r.orderSide==='sell'?'🔴 Sell':'🟢 Buy'} · ${runtime.assets[r.assetKey].label} · APY ${Number.isFinite(apy)?apy.toFixed(2)+'%':'—'}`,
+      const market=bundle.market||data.market,marketCheckedAt=bundle.marketCheckedAt??data.checkedAt;
+      const currentMarket=!(bundle.marketStale??stale)&&Number.isFinite(marketCheckedAt)&&marketCheckedAt>0&&now-marketCheckedAt<=30000
+        &&market?.vaultAddress===r.vault&&market.maturityDateUnixTs===r.maturity
+        &&market.underlyingAsset?.mint===runtime.assets[r.assetKey]?.mint&&market.orderbookAddresses?.includes(r.book);
+      lines.push(`${r.orderSide==='sell'?'🔴 Sell':'🟢 Buy'} · ${runtime.assets[r.assetKey].label} · Limit APY ${Number.isFinite(apy)?apy.toFixed(2)+'%':'—'}`,
         `👛 Wallet: ${shortWallet(r.owner)}`,
+        `📈 Current Implied APY: ${currentMarket?runtime.formatImpliedApy(market.impliedApy):'—'}`,
         `🎁 Rewards APY: ${!stale&&rewards?runtime.orderRewardsText(r,rewards,now):'—'}`,
         `📍 Position: ${position?`${position.index} / ${position.total}`:'—'} · ${status} ${status==='Verified'?'✅':'⚠️'}`,'');
     }
